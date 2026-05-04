@@ -1,0 +1,1932 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Actual Turnover — TEST LOCALE</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daterangepicker@3.1.0/daterangepicker.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker@3.1.0/daterangepicker.css" />
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/css/select2.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/js/select2.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+:root {
+    --bg:        #0f1624;
+    --bg-elev:   #182235;
+    --bg-elev2:  #1f2b41;
+    --bg-row-a:  #141d2e;
+    --bg-row-b:  #18223a;
+    --bg-expanded: #35527f;
+    --bg-drill1:  #40608f;
+    --bg-drill2:  #55769f;
+    --bg-drill3:  #6e8cb5;
+    --bg-hover:   #2e4370;
+    --border:    #2c3a55;
+    --border-soft: #243149;
+    --text:      #e5eaf3;
+    --text-mute: #9aa7bd;
+    --text-dim:  #6f7d96;
+    --accent:    #4f8cff;
+    --accent-2:  #6aa1ff;
+    --warn-bg:   #3a2f12;
+    --warn-bd:   #6b5116;
+    --warn-fg:   #f5d27a;
+    --neg:       #ff6b6b;
+    --pos:       #4ade80;
+}
+
+body { margin: 0; font-family: Arial, sans-serif; font-size: 13px;
+        background: var(--bg); color: var(--text); }
+#Content { padding: 12px; }
+h1 { margin: 0 0 12px 0; color: var(--text); }
+h3 { color: var(--text); }
+
+.dev-banner { background: var(--warn-bg); color: var(--warn-fg);
+               padding: 6px 12px; font-size: 12px;
+               border-bottom: 1px solid var(--warn-bd); }
+
+.filter-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+              background: var(--bg-elev); padding: 10px; border-radius: 6px;
+              margin-bottom: 12px; border: 1px solid var(--border-soft); }
+.filter-bar label { display: block; font-size: 11px; color: var(--text-mute);
+                     margin-bottom: 2px; }
+.filter-bar .field { min-width: 140px; }
+.filter-bar input[type=text], .filter-bar select {
+    padding: 5px 7px; font-size: 13px;
+    background: var(--bg-elev2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px;
+}
+.filter-bar input[type=text]:focus, .filter-bar select:focus {
+    outline: none; border-color: var(--accent);
+}
+.filter-bar button { padding: 6px 14px; background: var(--accent); color: #fff;
+                      border: none; border-radius: 4px; cursor: pointer;
+                      font-weight: 600; }
+.filter-bar button:hover { background: var(--accent-2); }
+.filter-bar button.secondary { background: #485874; }
+.filter-bar button.secondary:hover { background: #5a6c8c; }
+
+.kpi-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.kpi { background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: 6px; padding: 10px 14px; min-width: 140px; }
+.kpi .lbl { font-size: 11px; color: var(--text-mute); text-transform: uppercase;
+            letter-spacing: .5px; }
+.kpi .val { font-size: 18px; font-weight: bold; margin-top: 4px; color: var(--text); }
+
+.tabs { display: flex; flex-wrap: wrap; border-bottom: 2px solid var(--accent);
+         margin-bottom: 8px; gap: 2px; }
+.tabs a { padding: 7px 14px; cursor: pointer; background: var(--bg-elev);
+           border: 1px solid var(--border); border-bottom: none;
+           border-radius: 4px 4px 0 0; color: var(--text-mute);
+           text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+           max-width: 340px; white-space: nowrap; overflow: hidden;
+           text-overflow: ellipsis; }
+.tabs a:hover { color: var(--text); background: var(--bg-elev2); }
+.tabs a.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tabs a .tab-close { display: inline-flex; align-items: center; justify-content: center;
+                      width: 16px; height: 16px; border-radius: 50%;
+                      font-size: 11px; line-height: 1; color: inherit; opacity: .65;
+                      background: transparent; }
+.tabs a .tab-close:hover { background: rgba(0,0,0,0.35); opacity: 1; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Icona lente accanto al nome nelle tabelle gerarchiche */
+.row-lens { display: inline-block; margin-left: 6px; cursor: pointer;
+             font-size: 12px; opacity: .55; transition: opacity .15s, transform .15s;
+             padding: 1px 4px; border-radius: 3px; user-select: none; }
+.row-lens:hover { opacity: 1; transform: scale(1.15);
+                   background: rgba(255,255,255,0.08); }
+
+/* Dettaglio prodotti: header + paginazione */
+.pd-header { background: var(--bg-elev); border: 1px solid var(--border);
+              border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;
+              display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.pd-header .pd-crumb { font-weight: 600; color: var(--text); }
+.pd-header .pd-crumb .sep { color: var(--text-dim); margin: 0 4px; }
+.pd-header .pd-meta { color: var(--text-mute); font-size: 12px; }
+
+.pd-pager { display: flex; align-items: center; gap: 8px; margin: 10px 0;
+             color: var(--text-mute); font-size: 12px; }
+.pd-pager button { background: var(--bg-elev2); color: var(--text);
+                    border: 1px solid var(--border); border-radius: 4px;
+                    padding: 4px 10px; cursor: pointer; }
+.pd-pager button:disabled { opacity: .4; cursor: not-allowed; }
+.pd-pager button:not(:disabled):hover { border-color: var(--accent); color: #fff; }
+.pd-pager input { background: var(--bg-elev2); color: var(--text);
+                   border: 1px solid var(--border); border-radius: 4px;
+                   padding: 3px 6px; width: 60px; text-align: center; }
+
+/* Tabella dettaglio prodotti: zebra chiara, compatta */
+table.pd-table { width: 100%; border-collapse: separate; border-spacing: 0;
+                  font-size: 12px; background: var(--bg-elev);
+                  border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+table.pd-table th, table.pd-table td { padding: 6px 8px;
+                                         border-bottom: 1px solid var(--border-soft);
+                                         text-align: right; white-space: nowrap; }
+table.pd-table th { background: #1a2b4a; color: var(--text);
+                     text-align: center; border-bottom: 2px solid var(--accent);
+                     position: sticky; top: 0; z-index: 1; cursor: pointer; }
+table.pd-table th:hover { background: #223763; }
+table.pd-table th.sorted-asc::after  { content: " \25B2"; font-size: 9px; }
+table.pd-table th.sorted-desc::after { content: " \25BC"; font-size: 9px; }
+table.pd-table td.text { text-align: left; white-space: normal; }
+table.pd-table tbody tr:nth-child(odd)  td { background: var(--bg-row-a); }
+table.pd-table tbody tr:nth-child(even) td { background: var(--bg-row-b); }
+table.pd-table tbody tr:hover td { background: var(--bg-hover); }
+.pd-table .mono { font-family: Consolas, 'Courier New', monospace; font-size: 11.5px;
+                   color: #c9d6ee; }
+
+/* Barra split + metrica */
+.split-bar { display: flex; gap: 10px; align-items: center; margin: 2px 0 10px 0; }
+.split-bar .split-metric { color: var(--text-mute); font-size: 12px;
+                             display: inline-flex; align-items: center; gap: 6px; }
+.split-bar .split-metric select { background: var(--bg-elev2); color: var(--text);
+                                    border: 1px solid var(--border); border-radius: 4px;
+                                    padding: 3px 6px; font-size: 12px; }
+button.split-toggle { background: var(--bg-elev2); color: var(--text);
+                       border: 1px solid var(--border); border-radius: 4px;
+                       padding: 5px 12px; cursor: pointer; font-size: 12px;
+                       display: inline-flex; align-items: center; gap: 6px; }
+button.split-toggle::before { content: "\25A3"; font-size: 14px; color: var(--text-mute); }
+button.split-toggle:hover { border-color: var(--accent); color: #fff; }
+button.split-toggle.active { background: var(--accent); color: #fff;
+                              border-color: var(--accent); }
+button.split-toggle.active::before { color: #fff; }
+
+.split-bar button.btn-expand-all { background: var(--bg-elev2); color: var(--text);
+                                    border: 1px solid var(--border);
+                                    border-radius: 4px; padding: 5px 12px;
+                                    cursor: pointer; font-size: 12px;
+                                    display: inline-flex; align-items: center; gap: 6px; }
+.split-bar button.btn-expand-all::before { content: "\22A1"; font-size: 13px;
+                                            color: var(--text-mute); }
+.split-bar button.btn-expand-all:hover { border-color: var(--accent); color: #fff; }
+.split-bar button.btn-expand-all:hover::before { color: #fff; }
+
+/* Tabella pivot: sfondo riga/colonna totale evidenziato, colonne strette */
+table.report.pivot th, table.report.pivot td { padding: 5px 6px; font-size: 11.5px; }
+table.report.pivot th.col-mktp { min-width: 80px; }
+table.report.pivot th.col-total,
+table.report.pivot td.col-total { background: #213557 !important; font-weight: 600;
+                                    border-left: 2px solid var(--accent); }
+table.report.pivot tr.total td.col-total { background: #1a2b4a !important; }
+table.report.pivot .cell-zero { color: var(--text-dim); }
+
+/* Toggle +/- su header marketplace (espansione per-colonna) */
+.mktp-toggle { display: inline-flex; align-items: center; justify-content: center;
+                width: 16px; height: 16px; margin-left: 6px;
+                background: rgba(255,255,255,0.12);
+                border: 1px solid rgba(255,255,255,0.18);
+                border-radius: 3px; cursor: pointer; font-size: 12px;
+                line-height: 1; color: var(--text); user-select: none;
+                font-weight: bold; vertical-align: middle; }
+.mktp-toggle:hover { background: var(--accent); border-color: var(--accent-2);
+                      color: #fff; }
+
+/* Header raggruppato (quando un marketplace è espanso) */
+table.report.pivot th.col-mktp-grp,
+table.pd-table th.col-mktp-grp { background: #223763 !important; font-weight: 700; }
+
+/* Sub-header (2a riga thead) per colonne espanse */
+table.report.pivot th.col-mktp-sub,
+table.pd-table th.col-mktp-sub { font-size: 10.5px; font-weight: 500;
+                                   color: var(--text-mute); background: #152239 !important;
+                                   text-transform: uppercase; letter-spacing: .3px;
+                                   border-bottom: 2px solid var(--accent); }
+
+/* Separatori visivi per i gruppi di metriche espanse */
+table.report.pivot td.sub-first,
+table.report.pivot th.sub-first,
+table.pd-table td.sub-first,
+table.pd-table th.sub-first { border-left: 2px solid var(--accent-2) !important; }
+table.report.pivot td.sub-last,
+table.pd-table td.sub-last { border-right: 1px solid var(--border); }
+table.report.pivot td.mktp-sub,
+table.pd-table td.mktp-sub { background: rgba(79,140,255,0.04); }
+
+table.report { width: 100%; border-collapse: separate; border-spacing: 0;
+                font-size: 12px; background: var(--bg-elev);
+                border: 1px solid var(--border); border-radius: 6px;
+                overflow: hidden; }
+table.report th, table.report td { border-bottom: 1px solid var(--border-soft);
+                                     padding: 7px 10px; text-align: right; }
+table.report th { background: #1a2b4a; color: var(--text);
+                   text-align: center; cursor: pointer;
+                   border-bottom: 2px solid var(--accent);
+                   font-weight: 600; letter-spacing: .3px;
+                   position: sticky; top: 0; z-index: 1; }
+table.report th:hover { background: #223763; }
+table.report td.text { text-align: left; }
+
+/* Zebra striping sulle righe base */
+table.report tbody tr:nth-child(odd)  td { background: var(--bg-row-a); }
+table.report tbody tr:nth-child(even) td { background: var(--bg-row-b); }
+
+/* Hover */
+table.report tbody tr:hover td { background: var(--bg-hover); }
+
+/* Riga totale */
+table.report tr.total td { background: #1a2b4a !important;
+                            color: var(--text); font-weight: bold;
+                            border-top: 2px solid var(--accent); }
+
+/* Drill level 1: rientrato + colore distinto (pi\u00f9 chiaro della base) */
+table.report tr.drill td { padding-left: 28px;
+                            background: var(--bg-drill1) !important;
+                            color: #f1f5ff; font-style: italic; }
+table.report tr.drill td:first-child {
+    border-left: 4px solid var(--accent);
+}
+table.report tr.drill:hover td { background: #4b6da0 !important; }
+
+/* Drill level 2 (cate3): ancora pi\u00f9 chiaro, rientro maggiore */
+table.report tr.drill.lvl2 td { padding-left: 48px;
+                                 background: var(--bg-drill2) !important;
+                                 font-style: normal; color: #ffffff; }
+table.report tr.drill.lvl2 td:first-child {
+    border-left: 6px solid var(--accent-2);
+}
+table.report tr.drill.lvl2:hover td { background: #6282ad !important; }
+
+/* Drill level 3 (marca): livello finale, chiarissimo, non espandibile */
+table.report tr.drill.lvl3 td { padding-left: 72px;
+                                 background: var(--bg-drill3) !important;
+                                 color: #0f1624;
+                                 font-style: normal; font-size: 11.5px; }
+table.report tr.drill.lvl3 td:first-child {
+    border-left: 8px solid #cfe0ff;
+}
+table.report tr.drill.lvl3:hover td { background: #8aa5c9 !important; }
+
+/* Riga espandibile aperta: marcata con sfondo distinto e barra spessa */
+table.report tr.expandable { cursor: pointer; }
+table.report tr.expanded td { background: var(--bg-expanded) !important;
+                               color: #fff !important;
+                               font-weight: 700; }
+table.report tr.expanded td:first-child {
+    border-left: 4px solid var(--accent-2);
+}
+
+table.report tr.expandable td:first-child::before { content: "\25B6";
+    display: inline-block; width: 14px; color: var(--accent);
+    font-size: 10px; transition: transform .15s; margin-right: 6px; }
+table.report tr.expanded td:first-child::before { transform: rotate(90deg);
+    color: var(--accent-2); }
+
+.loading { padding: 14px; font-style: italic; color: var(--text-dim); }
+.neg { color: var(--neg); }
+.pos { color: var(--pos); }
+
+#chart-container { max-width: 900px; margin-top: 10px;
+                    background: var(--bg-elev); padding: 10px;
+                    border: 1px solid var(--border); border-radius: 6px; }
+
+/* Select2 in tema scuro */
+.select2-container--default .select2-selection--single,
+.select2-container--default .select2-selection--multiple {
+    background: var(--bg-elev2) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+}
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: var(--text) !important;
+}
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background: var(--accent) !important;
+    border-color: var(--accent-2) !important;
+    color: #fff !important;
+    padding: 1px 6px !important;
+}
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    color: #fff !important;
+    margin-right: 4px !important;
+}
+.select2-container--default .select2-search--inline .select2-search__field {
+    color: var(--text) !important;
+}
+.select2-dropdown {
+    background: var(--bg-elev2) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+.select2-container--default .select2-results__option {
+    color: var(--text) !important;
+}
+.select2-container--default .select2-results__option--highlighted,
+.select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
+    background: var(--accent) !important;
+    color: #fff !important;
+}
+.select2-container--default .select2-results__option[aria-selected=true] {
+    background: var(--bg-hover) !important;
+    color: var(--text) !important;
+}
+.select2-search--dropdown .select2-search__field {
+    background: var(--bg-elev) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+.select2-container--default .select2-selection--multiple .select2-selection__clear {
+    color: var(--text-mute) !important;
+    margin-right: 6px !important;
+}
+
+/* Daterangepicker in tema scuro */
+.daterangepicker { background: var(--bg-elev) !important;
+                    border: 1px solid var(--border) !important;
+                    color: var(--text) !important; }
+.daterangepicker .calendar-table { background: var(--bg-elev) !important;
+                                     border-color: var(--border) !important; }
+.daterangepicker td.available:hover, .daterangepicker th.available:hover {
+    background: var(--accent) !important; color: #fff !important; }
+.daterangepicker td.in-range { background: #2a3d63 !important; color: var(--text) !important; }
+.daterangepicker td.active, .daterangepicker td.active:hover {
+    background: var(--accent) !important; color: #fff !important; }
+.daterangepicker .ranges li:hover { background: var(--bg-hover) !important; }
+.daterangepicker .ranges li.active { background: var(--accent) !important; }
+.daterangepicker select { background: var(--bg-elev2); color: var(--text);
+                            border: 1px solid var(--border); }
+
+/* ==========================================================================
+   Bottone toggle filtri (visibile solo su mobile)
+   ========================================================================== */
+.filter-toggle { display: none; }
+/* Bottone espandi-colonne su mobile: nascosto di default, attivato dal media query */
+.btn-cols-sm { display: none; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch;
+                 border-radius: 6px; }
+
+/* Evidenzia righe top prodotti */
+table.report.top-prods tbody tr:first-child td { font-weight: 600; }
+
+/* ==========================================================================
+   MOBILE (<=768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+    body { font-size: 12px; }
+    #Content { padding: 8px; }
+    h1 { font-size: 18px; margin: 0 0 10px 0; }
+    h3 { font-size: 14px; }
+
+    .dev-banner { font-size: 11px; padding: 5px 10px; }
+
+    /* --- Filtri collassati di default su mobile --- */
+    .filter-toggle { display: block; width: 100%;
+                      background: var(--accent); color: #fff;
+                      border: none; padding: 10px 12px; font-size: 14px;
+                      font-weight: 600; border-radius: 6px;
+                      margin-bottom: 8px; cursor: pointer; text-align: left; }
+    .filter-toggle::after { content: " \25BC"; float: right; font-size: 12px; }
+    .filter-toggle.open::after { content: " \25B2"; }
+
+    .filter-bar { display: none; flex-direction: column; align-items: stretch;
+                   padding: 10px; gap: 8px; margin-bottom: 10px; }
+    .filter-bar.open { display: flex; }
+    .filter-bar .field { width: 100% !important; min-width: 0 !important; }
+    .filter-bar .field input[type=text],
+    .filter-bar .field select { width: 100% !important; box-sizing: border-box; }
+    .filter-bar .field .select2-container { width: 100% !important; }
+    .filter-bar .field:last-child { display: flex; gap: 8px; }
+    .filter-bar .field:last-child button { flex: 1; padding: 10px; font-size: 14px; }
+
+    /* --- KPI: 2 per riga, compatti --- */
+    .kpi-row { gap: 6px; margin-bottom: 8px; }
+    .kpi { min-width: 0; flex: 1 1 calc(50% - 3px); padding: 8px 10px; }
+    .kpi .val { font-size: 15px; }
+    .kpi .lbl { font-size: 10px; }
+
+    /* --- Tabs: scroll orizzontale (no a capo) --- */
+    .tabs { flex-wrap: nowrap; overflow-x: auto;
+             -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+             padding-bottom: 2px; }
+    .tabs a { flex: 0 0 auto; font-size: 12px; padding: 6px 10px;
+               max-width: none; }
+
+    /* --- Wrap delle tabelle: scroll orizzontale --- */
+    #summary-wrap, #top-products-wrap, #marketplace-wrap, #geo-wrap,
+    #trend-table-wrap, .tab-panel[id^="tab-pd-"] > .table-scroll,
+    .tab-panel[id^="tab-pd-"] table,
+    .table-scroll {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* --- Tabelle: font e padding compatti --- */
+    table.report, table.pd-table {
+        font-size: 11px;
+    }
+    table.report th, table.report td,
+    table.pd-table th, table.pd-table td {
+        padding: 5px 6px; white-space: nowrap;
+    }
+    table.report td.text, table.pd-table td.text {
+        white-space: normal; max-width: 180px; word-wrap: break-word;
+    }
+
+    /* --- Prima colonna "sticky" per mantenere contesto durante lo scroll --- */
+    table.report th:first-child, table.report td:first-child,
+    table.pd-table th:first-child, table.pd-table td:first-child {
+        position: sticky; left: 0; z-index: 2;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.4);
+    }
+    table.report th:first-child, table.pd-table th:first-child {
+        background: #1a2b4a !important;
+    }
+    table.report tbody tr:nth-child(odd)  td:first-child { background: var(--bg-row-a) !important; }
+    table.report tbody tr:nth-child(even) td:first-child { background: var(--bg-row-b) !important; }
+    table.report tr.total td:first-child { background: #1a2b4a !important; }
+    table.report tr.expanded td:first-child { background: var(--bg-expanded) !important; }
+    table.report tr.drill td:first-child { background: var(--bg-drill1) !important; }
+    table.report tr.drill.lvl2 td:first-child { background: var(--bg-drill2) !important; }
+    table.report tr.drill.lvl3 td:first-child { background: var(--bg-drill3) !important; }
+
+    /* Drill: rientri ridotti su mobile per non perdere troppo spazio */
+    table.report tr.drill td { padding-left: 14px !important; }
+    table.report tr.drill.lvl2 td { padding-left: 22px !important; }
+    table.report tr.drill.lvl3 td { padding-left: 30px !important; }
+
+    /* Colonne nascondibili (utility) */
+    .hide-sm { display: none !important; }
+
+    /* Colonne extra (Prezzo medio, Costo) nascoste di default su mobile */
+    table.report .col-extra-sm { display: none !important; }
+    table.report.show-extra-sm .col-extra-sm { display: table-cell !important; }
+
+    /* Bottone [+]/[−] per espandere le colonne extra su mobile */
+    .btn-cols-sm {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 17px; height: 17px;
+        background: rgba(79,140,255,0.15);
+        border: 1px solid var(--accent); border-radius: 3px;
+        color: var(--accent); font-size: 13px; font-weight: bold;
+        cursor: pointer; margin-left: 5px; vertical-align: middle;
+        line-height: 1; padding: 0; flex-shrink: 0;
+    }
+    .btn-cols-sm:hover { background: var(--accent); color: #fff; }
+
+    /* --- Split bar compatta --- */
+    .split-bar { flex-wrap: wrap; gap: 6px; }
+    .split-bar button, .split-bar .split-metric { font-size: 11px; }
+    .split-bar button { padding: 6px 8px; }
+    button.split-toggle { padding: 6px 10px; }
+
+    /* --- Header dettaglio prodotti --- */
+    .pd-header { flex-direction: column; align-items: flex-start; gap: 4px;
+                  padding: 8px 10px; }
+    .pd-header .pd-crumb { font-size: 13px; }
+    .pd-header .pd-meta { font-size: 11px; }
+
+    /* --- Pager compatto --- */
+    .pd-pager { flex-wrap: wrap; gap: 6px; font-size: 11px; }
+    .pd-pager button { padding: 4px 8px; }
+
+    /* --- Chart container full-width --- */
+    #chart-container { max-width: 100%; padding: 6px; }
+
+    /* --- Daterangepicker: più visibile su touch --- */
+    .daterangepicker { font-size: 12px; }
+}
+
+/* --- Schermi molto piccoli (<=420px) --- */
+@media (max-width: 420px) {
+    .kpi { flex: 1 1 100%; }
+    .kpi .val { font-size: 16px; }
+    h1 { font-size: 16px; }
+    .dev-banner { display: none; }  /* risparmia spazio */
+}
+</style>
+</head>
+<body>
+<div class="dev-banner">
+  AMBIENTE DI TEST LOCALE — nessuna autenticazione ASP. Non usare in produzione.
+</div>
+
+<div id="Content">
+<h1>E-commerce Actual Turnover (test)</h1>
+
+<button id="btn-filter-toggle" class="filter-toggle" type="button">Filtri e periodo</button>
+
+<div class="filter-bar">
+    <div class="field">
+        <label>Periodo</label>
+        <input type="text" id="date-range" readonly style="width:200px;" />
+    </div>
+    <div class="field" style="min-width:220px;">
+        <label>Marketplace</label>
+        <select id="f-marketplace" multiple style="width:220px;"></select>
+    </div>
+    <div class="field" style="min-width:200px;">
+        <label>Fornitore</label>
+        <select id="f-fornitore" multiple style="width:200px;"></select>
+    </div>
+    <div class="field" style="min-width:200px;">
+        <label>Macro categoria</label>
+        <select id="f-macrocat" multiple style="width:200px;"></select>
+    </div>
+    <div class="field" style="min-width:200px;">
+        <label>Categoria</label>
+        <select id="f-cate2" multiple style="width:200px;"></select>
+    </div>
+    <div class="field" style="min-width:200px;">
+        <label>Sotto-cat.</label>
+        <select id="f-cate3" multiple style="width:200px;"></select>
+    </div>
+    <div class="field" style="min-width:200px;">
+        <label>Marca</label>
+        <select id="f-marca" multiple style="width:200px;"></select>
+    </div>
+    <div class="field">
+        <label>Codice prodotto</label>
+        <input type="text" id="f-codice" style="width:130px;" placeholder="es. GED-SAM-LAV-001" />
+    </div>
+    <div class="field">
+        <button id="btn-search">Aggiorna</button>
+        <button id="btn-export" class="secondary">↓ Excel</button>
+    </div>
+</div>
+
+<div class="kpi-row" id="kpi-row">
+    <div class="kpi"><div class="lbl">Pezzi venduti</div><div class="val" id="kpi-qta">—</div></div>
+    <div class="kpi"><div class="lbl">Fatturato</div><div class="val" id="kpi-turnover">—</div></div>
+    <div class="kpi"><div class="lbl">Prezzo medio</div><div class="val" id="kpi-avg">—</div></div>
+    <div class="kpi"><div class="lbl">Margine %</div><div class="val" id="kpi-margin">—</div></div>
+</div>
+
+<div class="tabs">
+    <a data-tab="tab-summary" class="active">Riepilogo</a>
+    <a data-tab="tab-marketplace">Ripartizione Marketplace</a>
+    <a data-tab="tab-fornitori">Fornitori</a>
+    <a data-tab="tab-trend">Trend</a>
+    <a data-tab="tab-geo">Geografico</a>
+</div>
+
+<div id="tab-summary" class="tab-panel active">
+    <div class="split-bar">
+        <button id="btn-split" class="split-toggle" type="button">Split per marketplace</button>
+        <label class="split-metric" style="display:none;">
+            Metrica:
+            <select id="split-metric">
+                <option value="turnover" selected>Fatturato</option>
+                <option value="qta">Pezzi</option>
+                <option value="prezzo_medio">Prezzo medio</option>
+                <option value="costo">Costo</option>
+                <option value="margine_pct">Margine %</option>
+            </select>
+        </label>
+        <button id="btn-expand-all" class="btn-expand-all" type="button"
+                style="display:none;">Espandi tutti</button>
+    </div>
+    <div id="summary-wrap"><div class="loading">Caricamento...</div></div>
+
+    <h3 style="margin:18px 0 8px 0;">Top 40 prodotti per fatturato</h3>
+    <div id="top-products-wrap"><div class="loading">Caricamento...</div></div>
+</div>
+
+<div id="tab-marketplace" class="tab-panel">
+    <div id="marketplace-wrap"><div class="loading">Seleziona questa tab per caricare.</div></div>
+</div>
+
+<div id="tab-fornitori" class="tab-panel">
+    <div class="split-bar">
+        <button id="btn-split-forn" class="split-toggle" type="button">Split per marketplace</button>
+        <label class="split-metric-forn" style="display:none;">
+            Metrica:
+            <select id="split-metric-forn">
+                <option value="turnover" selected>Fatturato</option>
+                <option value="qta">Pezzi</option>
+                <option value="prezzo_medio">Prezzo medio</option>
+                <option value="costo">Costo</option>
+                <option value="margine_pct">Margine %</option>
+            </select>
+        </label>
+        <button id="btn-expand-all-forn" class="btn-expand-all" type="button"
+                style="display:none;">Espandi tutti</button>
+    </div>
+    <div id="fornitori-wrap"><div class="loading">Seleziona questa tab per caricare.</div></div>
+</div>
+
+<div id="tab-trend" class="tab-panel">
+    <div style="margin-bottom:8px;">
+        Vista:
+        <select id="trend-dim">
+            <option value="day">Giornaliera</option>
+            <option value="weekday">Giorno settimana</option>
+            <option value="hour">Oraria</option>
+            <option value="month">Mensile</option>
+        </select>
+    </div>
+    <div id="chart-container"><canvas id="trend-chart" height="120"></canvas></div>
+    <div id="trend-table-wrap" style="margin-top:14px;"></div>
+</div>
+
+<div id="tab-geo" class="tab-panel">
+    <h3 style="margin:8px 0;">Top province per fatturato</h3>
+    <div id="geo-wrap"><div class="loading">Seleziona questa tab per caricare.</div></div>
+</div>
+
+</div><!-- /#Content -->
+
+<script>
+// In test locale API_BASE relativa all'origin (FastAPI la serve da qui stesso).
+const API_BASE = "/api/reports";
+
+// In dev, lo scriviamo in sessionStorage al primo avvio oppure lo leggiamo da URL.
+// Tanto il middleware in dev accetta anche senza token se INTERNAL_TOKEN=="".
+const INTERNAL_TOKEN = new URLSearchParams(location.search).get("token")
+    || sessionStorage.getItem("INTERNAL_TOKEN")
+    || "";
+
+const fmtInt   = new Intl.NumberFormat("it-IT");
+const fmtMoney = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const asMoney  = v => (v == null ? "-" : fmtMoney.format(v) + " €");
+const asInt    = v => (v == null ? "-" : fmtInt.format(v));
+const asPct    = v => (v == null ? "-" : fmtMoney.format(v) + "%");
+
+async function api(path, extraParams) {
+    const params = new URLSearchParams(currentFilters());
+    if (extraParams) Object.entries(extraParams).forEach(([k, v]) => {
+        if (Array.isArray(v)) v.forEach(x => params.append(k, x));
+        else if (v != null && v !== "") params.set(k, v);
+    });
+    const headers = {};
+    if (INTERNAL_TOKEN) headers["X-Internal-Token"] = INTERNAL_TOKEN;
+    const res = await fetch(`${API_BASE}${path}?${params.toString()}`, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    return res.json();
+}
+
+function currentFilters() {
+    const range = $('#date-range').val().split('/');
+    const params = new URLSearchParams();
+    params.set('dal', (range[0] || '').trim());
+    params.set('al',  (range[1] || '').trim());
+
+    // tutti i filtri "catalogo" sono multi-select
+    const multi = {
+        marketplace: '#f-marketplace',
+        fornitore:   '#f-fornitore',
+        macrocat:    '#f-macrocat',
+        cate2:       '#f-cate2',
+        cate3:       '#f-cate3',
+        marca:       '#f-marca',
+    };
+    Object.entries(multi).forEach(([k, sel]) => {
+        ( $(sel).val() || [] ).forEach(v => { if (v) params.append(k, v); });
+    });
+
+    const codice = ($('#f-codice').val() || '').trim();
+    if (codice) params.set('codice', codice);
+
+    return params;
+}
+
+$(function() {
+    $('#date-range').daterangepicker({
+        startDate: moment(),
+        endDate: moment(),
+        locale: { format: 'YYYY-MM-DD', separator: ' / ', applyLabel: 'OK', cancelLabel: 'Annulla' },
+        ranges: {
+           'Oggi':          [moment(), moment()],
+           'Ieri':          [moment().subtract(1,'days'), moment().subtract(1,'days')],
+           'Ultimi 7 gg':   [moment().subtract(6,'days'), moment()],
+           'Ultimi 30 gg':  [moment().subtract(29,'days'), moment()],
+           'Ultimi 90 gg':  [moment().subtract(89,'days'), moment()],
+           'Questo mese':   [moment().startOf('month'), moment().endOf('month')],
+           'Mese scorso':   [moment().subtract(1,'month').startOf('month'),
+                             moment().subtract(1,'month').endOf('month')]
+        }
+    });
+
+    // tutti i filtri categoria/brand/fornitore/marketplace: multi + ricerca
+    $('#f-marketplace, #f-fornitore, #f-macrocat, #f-cate2, #f-cate3, #f-marca')
+        .select2({
+            placeholder: 'Tutti',
+            allowClear: true,
+            width: 'element'
+        });
+
+    loadFilterOptions();
+
+    // Toggle filtri su mobile
+    $('#btn-filter-toggle').on('click', function() {
+        $('.filter-bar').toggleClass('open');
+        $(this).toggleClass('open');
+    });
+
+    $('#btn-search').on('click', function() {
+        reloadAll();
+        // Su mobile, dopo aver cliccato "Aggiorna", richiudi il pannello filtri
+        // per lasciare spazio ai risultati.
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            $('.filter-bar').removeClass('open');
+            $('#btn-filter-toggle').removeClass('open');
+        }
+    });
+    $('#btn-export').on('click', onExport);
+    $('.tabs a').on('click', switchTab);
+    $('#trend-dim').on('change', loadTrend);
+    $('#f-macrocat, #f-cate2, #f-cate3').on('change', loadDependentOptions);
+    $('#btn-split').on('click', toggleSummarySplit);
+    $('#split-metric').on('change', () => { if (splitState.on) renderSplitSummary(); });
+    $('#btn-expand-all').on('click', onExpandAllSummary);
+    $('#btn-split-forn').on('click', toggleFornitoiSplit);
+    $('#split-metric-forn').on('change', () => { if (fornitoriState.on) renderFornitoiSplit(); });
+    $('#btn-expand-all-forn').on('click', onExpandAllFornitori);
+
+    reloadAll();
+});
+
+async function loadFilterOptions() {
+    try {
+        const res = await fetch(`${API_BASE}/turnover/filters`,
+            INTERNAL_TOKEN ? { headers: { "X-Internal-Token": INTERNAL_TOKEN } } : {});
+        const opts = await res.json();
+        fillSelect('#f-marketplace', opts.marketplace);
+        fillSelect('#f-fornitore',   opts.fornitore);
+        fillSelect('#f-macrocat',    opts.macrocat);
+        await loadDependentOptions();
+    } catch (e) { console.error('filters:', e); }
+}
+
+async function loadDependentOptions() {
+    try {
+        const data = await api('/turnover/filters/dependent');
+        fillSelect('#f-cate2', data.cate2);
+        fillSelect('#f-cate3', data.cate3);
+        fillSelect('#f-marca', data.marca);
+    } catch (e) { console.error('dep:', e); }
+}
+
+// Tutti i select dei filtri sono multi + select2.
+function fillSelect(sel, values) {
+    const $s = $(sel);
+    const current = $s.val() || [];
+    $s.empty();
+    (values || []).forEach(v =>
+        $s.append(`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`)
+    );
+    // mantieni solo le selezioni ancora valide
+    const keep = current.filter(v => values && values.includes(v));
+    if (keep.length) $s.val(keep);
+    $s.trigger('change.select2');
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+
+function switchTab(e) {
+    e.preventDefault();
+    const tab = $(this).data('tab');
+    $('.tabs a').removeClass('active');
+    $(this).addClass('active');
+    $('.tab-panel').removeClass('active');
+    $('#' + tab).addClass('active');
+    if (tab === 'tab-marketplace') loadMarketplaceBreakdown();
+    if (tab === 'tab-fornitori')   loadFornitori();
+    if (tab === 'tab-trend')       loadTrend();
+    if (tab === 'tab-geo')         loadGeo();
+}
+
+async function reloadAll() {
+    await loadSummary();
+    if ($('#tab-marketplace').hasClass('active')) loadMarketplaceBreakdown();
+    if ($('#tab-fornitori').hasClass('active'))   loadFornitori();
+    if ($('#tab-trend').hasClass('active'))       loadTrend();
+    if ($('#tab-geo').hasClass('active'))         loadGeo();
+    // ricarica eventuale tab "dettaglio prodotti" attivo
+    Object.keys(productTabs).forEach(tabId => {
+        if ($('#' + tabId).hasClass('active')) {
+            productTabs[tabId].page = 1;
+            loadProductList(tabId);
+        }
+    });
+}
+
+async function loadSummary() {
+    const $wrap = $('#summary-wrap').html('<div class="loading">Caricamento...</div>');
+    try {
+        if (splitState.on) {
+            const [summary, split] = await Promise.all([
+                api('/turnover/summary'),
+                api('/turnover/summary-by-marketplace'),
+            ]);
+            splitState.summaryData = split;
+            renderKpi(summary.total);
+            renderSplitSummary();
+        } else {
+            const data = await api('/turnover/summary');
+            renderKpi(data.total);
+            renderSummaryTable(data);
+        }
+    } catch (e) {
+        $wrap.html(`<div class="loading neg">Errore: ${escapeHtml(e.message)}</div>`);
+    }
+    // Tabella top 40 prodotti: parte in parallelo, non blocca il summary principale.
+    loadTopProducts();
+}
+
+async function loadTopProducts() {
+    const $wrap = $('#top-products-wrap').html('<div class="loading">Caricamento...</div>');
+    try {
+        const data = await api('/turnover/product-list', {
+            page: 1,
+            page_size: 40,
+            sort_by: 'turnover',
+            sort_dir: 'desc',
+        });
+        renderTopProducts(data);
+    } catch (e) {
+        $wrap.html(`<div class="loading neg">Errore: ${escapeHtml(e.message)}</div>`);
+    }
+}
+
+function renderTopProducts(data) {
+    const $wrap = $('#top-products-wrap').empty();
+    if (!data.rows || !data.rows.length) {
+        $wrap.html('<div class="loading">Nessun prodotto nel periodo/filtri selezionati.</div>');
+        return;
+    }
+    const $scroll = $('<div class="table-scroll"></div>');
+    const $tbl = $(`<table class="report top-prods"><thead><tr>
+        <th style="text-align:left">Codice / Prodotto</th>
+        <th style="text-align:left" class="hide-sm">Marca</th>
+        <th>Pezzi</th>
+        <th class="hide-sm">Prezzo medio</th>
+        <th>Fatturato</th>
+        <th>Margine %</th>
+        </tr></thead><tbody></tbody></table>`);
+    const $tb = $tbl.find('tbody');
+    data.rows.forEach((r) => {
+        const $tr = $('<tr></tr>');
+        $tr.append(
+            `<td class="text">` +
+            `<span class="mono" style="font-size:11px;display:block;color:#c9d6ee;">${escapeHtml(r.codice || '')}</span>` +
+            `<span style="font-size:11.5px;color:var(--text-mute);">${escapeHtml(r.nome || '')}</span>` +
+            `</td>`
+        );
+        $tr.append(`<td class="text hide-sm">${escapeHtml(r.marca || '')}</td>`);
+        $tr.append(`<td>${asInt(r.qta)}</td>`);
+        $tr.append(`<td class="hide-sm">${asMoney(r.prezzo_medio)}</td>`);
+        $tr.append(`<td><strong>${asMoney(r.turnover)}</strong></td>`);
+        $tr.append(`<td>${asPct(r.margine_pct)}</td>`);
+        $tb.append($tr);
+    });
+    $scroll.append($tbl);
+    $wrap.append($scroll);
+}
+
+function renderKpi(t) {
+    $('#kpi-qta').text(asInt(t.qta));
+    $('#kpi-turnover').text(asMoney(t.turnover));
+    $('#kpi-avg').text(asMoney(t.prezzo_medio));
+    $('#kpi-margin').text(asPct(t.margine_pct));
+}
+
+function renderSummaryTable(data) {
+    const $wrap = $('#summary-wrap').empty();
+    const $tbl = $(`<table class="report"><thead><tr>
+        <th style="text-align:left">Macro categoria
+            <button class="btn-cols-sm" type="button" title="Mostra Prezzo medio e Costo">+</button>
+        </th>
+        <th>Pezzi</th>
+        <th class="col-extra-sm">Prezzo medio</th>
+        <th>Fatturato</th>
+        <th class="col-extra-sm">Costo</th>
+        <th>Margine %</th>
+        </tr></thead><tbody></tbody></table>`);
+
+    // Bottone [+]/[−]: espande/comprime le colonne extra su mobile
+    $tbl.find('.btn-cols-sm').on('click', function(e) {
+        e.stopPropagation();
+        const expanded = $tbl.toggleClass('show-extra-sm').hasClass('show-extra-sm');
+        $(this).text(expanded ? '−' : '+');
+    });
+
+    const $tb = $tbl.find('tbody');
+    $tb.append(makeRow({ macrocat: 'TOTALE', ...data.total }, 'total', 'macrocat'));
+    data.rows.forEach(r => {
+        const $tr = makeRow(r, 'expandable', 'macrocat',
+                            { macrocat: r.macrocat });
+        $tr.attr('data-macrocat', r.macrocat).on('click', onExpandMacrocat);
+        $tb.append($tr);
+    });
+    $wrap.append($tbl);
+}
+
+function makeRow(r, cls, labelField, lensCtx) {
+    const $tr = $(`<tr class="${cls || ''}"></tr>`);
+    const $label = $('<td class="text"></td>').text(r[labelField] || '');
+    if (lensCtx) {
+        const $lens = $('<span class="row-lens" title="Vedi dettaglio prodotti">\uD83D\uDD0D</span>');
+        $lens.on('click', (e) => { e.stopPropagation(); openProductDetail(lensCtx); });
+        $label.append($lens);
+    }
+    $tr.append($label);
+    $tr.append(`<td>${asInt(r.qta)}</td>`);
+    $tr.append(`<td class="col-extra-sm">${asMoney(r.prezzo_medio)}</td>`);
+    $tr.append(`<td>${asMoney(r.turnover)}</td>`);
+    $tr.append(`<td class="col-extra-sm">${asMoney(r.costo)}</td>`);
+    $tr.append(`<td>${asPct(r.margine_pct)}</td>`);
+    return $tr;
+}
+
+async function onExpandMacrocat(e) {
+    e.stopPropagation();
+    const $row = $(this);
+    const macro = $row.data('macrocat');
+    if ($row.hasClass('expanded')) {
+        $row.removeClass('expanded');
+        $row.nextUntil(':not(.drill)').remove();
+        return;
+    }
+    $row.addClass('expanded');
+    const data = await api('/turnover/drilldown/cate2', { macrocat: macro });
+    const rows = data.rows.length ? data.rows : [{ cate2: '(nessun dato)' }];
+    let $after = $row;
+    rows.forEach(r => {
+        const ctx = (r.qta != null) ? { macrocat: macro, cate2: r.cate2 } : null;
+        const $tr = makeRow(r, 'drill expandable lvl1', 'cate2', ctx);
+        $tr.attr('data-macrocat', macro).attr('data-cate2', r.cate2);
+        if (r.qta != null) $tr.on('click', onExpandCate2);
+        $tr.insertAfter($after);
+        $after = $tr;
+    });
+}
+
+async function onExpandCate2(e) {
+    e.stopPropagation();
+    const $row = $(this);
+    if ($row.hasClass('expanded')) {
+        $row.removeClass('expanded');
+        // rimuove solo i discendenti (lvl2 = cate3, lvl3 = marca)
+        $row.nextUntil(':not(.drill.lvl2, .drill.lvl3)').remove();
+        return;
+    }
+    $row.addClass('expanded');
+    const macro = $row.data('macrocat');
+    const cate2 = $row.data('cate2');
+    const data = await api('/turnover/drilldown/cate3', { macrocat: macro, cate2: cate2 });
+    const rows = data.rows.length ? data.rows : [{ cate3: '(nessun dato)' }];
+    let $after = $row;
+    rows.forEach(r => {
+        const ctx = (r.qta != null)
+            ? { macrocat: macro, cate2: cate2, cate3: r.cate3 } : null;
+        const $tr = makeRow(r, 'drill expandable lvl2', 'cate3', ctx);
+        $tr.attr('data-macrocat', macro)
+           .attr('data-cate2', cate2)
+           .attr('data-cate3', r.cate3);
+        if (r.qta != null) $tr.on('click', onExpandCate3);
+        $tr.insertAfter($after);
+        $after = $tr;
+    });
+}
+
+async function onExpandCate3(e) {
+    e.stopPropagation();
+    const $row = $(this);
+    if ($row.hasClass('expanded')) {
+        $row.removeClass('expanded');
+        $row.nextUntil(':not(.drill.lvl3)').remove();
+        return;
+    }
+    $row.addClass('expanded');
+    const macro = $row.data('macrocat');
+    const cate2 = $row.data('cate2');
+    const cate3 = $row.data('cate3');
+    const data = await api('/turnover/drilldown/marca',
+        { macrocat: macro, cate2: cate2, cate3: cate3 });
+    const rows = data.rows.length ? data.rows : [{ marca: '(nessun dato)' }];
+    let $after = $row;
+    rows.forEach(r => {
+        const ctx = (r.qta != null)
+            ? { macrocat: macro, cate2: cate2, cate3: cate3, marca: r.marca } : null;
+        const $tr = makeRow(r, 'drill lvl3', 'marca', ctx);
+        $tr.insertAfter($after);
+        $after = $tr;
+    });
+}
+
+async function loadMarketplaceBreakdown() {
+    const $wrap = $('#marketplace-wrap').html('<div class="loading">Caricamento...</div>');
+    try {
+        const data = await api('/turnover/marketplace-breakdown');
+        const $tbl = $(`<table class="report"><thead><tr>
+            <th style="text-align:left">Marketplace</th>
+            <th>Pezzi</th><th>Prezzo medio</th><th>Fatturato</th>
+            <th>Costo</th><th>Margine %</th>
+            </tr></thead><tbody></tbody></table>`);
+        data.rows.forEach(r => $tbl.find('tbody').append(makeRow(r, '', 'nomemktp')));
+        $wrap.empty().append($tbl);
+    } catch (e) { $wrap.html(`<div class="loading neg">Errore: ${escapeHtml(e.message)}</div>`); }
+}
+
+async function loadFornitori() {
+    const $wrap = $('#fornitori-wrap').html('<div class="loading">Caricamento...</div>');
+    try {
+        if (fornitoriState.on) {
+            const data = await api('/turnover/drilldown-by-marketplace/fornitore');
+            fornitoriState.splitData = data;
+            renderFornitoiSplit();
+        } else {
+            const data = await api('/turnover/drilldown/fornitore');
+            renderFornitoiFlat(data);
+        }
+    } catch (e) {
+        $('#fornitori-wrap').html(`<div class="loading neg">Errore: ${escapeHtml(e.message)}</div>`);
+    }
+}
+
+function renderFornitoiFlat(data) {
+    const $wrap = $('#fornitori-wrap').empty();
+    if (!data.rows || !data.rows.length) {
+        $wrap.html('<div class="loading">Nessun fornitore nel periodo selezionato.</div>');
+        return;
+    }
+    const $tbl = $(`<table class="report"><thead><tr>
+        <th style="text-align:left">Fornitore</th>
+        <th>Pezzi</th>
+        <th class="col-extra-sm">Prezzo medio</th>
+        <th>Fatturato</th>
+        <th class="col-extra-sm">Costo</th>
+        <th>Margine %</th>
+        </tr></thead><tbody></tbody></table>`);
+    data.rows.forEach(r => {
+        $tbl.find('tbody').append(
+            makeRow(r, '', 'fornitore', { fornitore: r.fornitore })
+        );
+    });
+    $wrap.append($tbl);
+}
+
+function renderFornitoiSplit() {
+    const data = fornitoriState.splitData;
+    if (!data) return;
+    const metric = $('#split-metric-forn').val() || 'turnover';
+    const mktps  = data.marketplaces || [];
+    const $wrap  = $('#fornitori-wrap').empty();
+
+    const $tbl = $('<table class="report pivot"></table>');
+    const $thead = buildPivotThead('Fornitore', mktps, metric,
+        fornitoriState.expandedMktps,
+        (m) => {
+            if (fornitoriState.expandedMktps.has(m)) fornitoriState.expandedMktps.delete(m);
+            else fornitoriState.expandedMktps.add(m);
+            renderFornitoiSplit();
+        });
+    $tbl.append($thead);
+
+    const $tb = $('<tbody></tbody>');
+    data.rows.forEach(r => {
+        $tb.append(makePivotRow(
+            r.fornitore || '(non valorizzato)',
+            r, mktps, metric,
+            { lensCtx: { fornitore: r.fornitore }, expanded: fornitoriState.expandedMktps }
+        ));
+    });
+    if (data.total_row) {
+        $tb.append(makePivotRow('TOTALE', data.total_row, mktps, metric,
+            { cls: 'total', expanded: fornitoriState.expandedMktps }));
+    }
+    $tbl.append($tb);
+    $wrap.append($tbl);
+    updateExpandAllBtn($('#btn-expand-all-forn'), mktps, fornitoriState.expandedMktps);
+}
+
+function toggleFornitoiSplit() {
+    fornitoriState.on = !fornitoriState.on;
+    $('#btn-split-forn').toggleClass('active', fornitoriState.on);
+    $('.split-metric-forn').toggle(fornitoriState.on);
+    $('#btn-expand-all-forn').toggle(fornitoriState.on);
+    loadFornitori();
+}
+
+function onExpandAllFornitori() {
+    const mktps = (fornitoriState.splitData && fornitoriState.splitData.marketplaces) || [];
+    if (mktps.length === 0) return;
+    const all = mktps.concat(['__TOTAL__']);
+    const isAllExp = all.every(m => fornitoriState.expandedMktps.has(m));
+    if (isAllExp) fornitoriState.expandedMktps.clear();
+    else fornitoriState.expandedMktps = new Set(all);
+    renderFornitoiSplit();
+}
+
+let trendChart = null;
+async function loadTrend() {
+    const dim = $('#trend-dim').val();
+    try {
+        const data = await api(`/turnover/trend/${dim}`);
+        renderTrendChart(data, dim);
+        renderTrendTable(data, dim);
+    } catch (e) {
+        $('#trend-table-wrap').html(`<div class="loading neg">Errore: ${escapeHtml(e.message)}</div>`);
+    }
+}
+
+function bucketLabel(v, dim) {
+    if (dim === 'weekday') return ['', 'Lun','Mar','Mer','Gio','Ven','Sab','Dom'][v] || v;
+    if (dim === 'hour')    return String(v).padStart(2,'0') + ':00';
+    return v;
+}
+
+function renderTrendChart(data, dim) {
+    const labels = data.rows.map(r => bucketLabel(r.bucket, dim));
+    const fatt   = data.rows.map(r => r.turnover);
+    const qta    = data.rows.map(r => r.qta);
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(document.getElementById('trend-chart'), {
+        type: 'bar',
+        data: { labels, datasets: [
+            { label: 'Fatturato (€)', data: fatt, backgroundColor: '#1F4E78', yAxisID: 'y' },
+            { label: 'Pezzi', data: qta, type: 'line', borderColor: '#d97706',
+              backgroundColor: '#d97706', yAxisID: 'y2', tension: 0.2 }
+        ]},
+        options: { responsive: true, scales: {
+            y:  { position: 'left',  title: { display: true, text: 'Fatturato €' } },
+            y2: { position: 'right', title: { display: true, text: 'Pezzi' },
+                   grid: { drawOnChartArea: false } }
+        }}
+    });
+}
+
+function renderTrendTable(data, dim) {
+    const $wrap = $('#trend-table-wrap');
+    const head = dim === 'weekday' ? 'Giorno' : dim === 'hour' ? 'Ora'
+               : dim === 'month' ? 'Mese' : 'Data';
+    const $tbl = $(`<table class="report"><thead><tr>
+        <th style="text-align:left">${head}</th>
+        <th>Pezzi</th><th>Prezzo medio</th><th>Fatturato</th><th>Margine %</th>
+        </tr></thead><tbody></tbody></table>`);
+    data.rows.forEach(r => {
+        $tbl.find('tbody').append(`<tr>
+            <td class="text">${escapeHtml(bucketLabel(r.bucket, dim))}</td>
+            <td>${asInt(r.qta)}</td>
+            <td>${asMoney(r.prezzo_medio)}</td>
+            <td>${asMoney(r.turnover)}</td>
+            <td>${asPct(r.margine_pct)}</td>
+        </tr>`);
+    });
+    $wrap.empty().append($tbl);
+}
+
+async function loadGeo() {
+    const $wrap = $('#geo-wrap').html('<div class="loading">Caricamento...</div>');
+    try {
+        const data = await api('/turnover/trend/province');
+        const $tbl = $(`<table class="report"><thead><tr>
+            <th style="text-align:left">Provincia</th>
+            <th>Pezzi</th><th>Prezzo medio</th><th>Fatturato</th><th>Margine %</th>
+            </tr></thead><tbody></tbody></table>`);
+        data.rows.slice(0, 50).forEach(r => {
+            $tbl.find('tbody').append(`<tr>
+                <td class="text">${escapeHtml(r.bucket)}</td>
+                <td>${asInt(r.qta)}</td>
+                <td>${asMoney(r.prezzo_medio)}</td>
+                <td>${asMoney(r.turnover)}</td>
+                <td>${asPct(r.margine_pct)}</td>
+            </tr>`);
+        });
+        $wrap.empty().append($tbl);
+    } catch (e) { $wrap.html(`<div class="loading neg">Errore: ${escapeHtml(e.message)}</div>`); }
+}
+
+function onExport() {
+    // La tabella esportata deve essere quella che l'utente sta guardando
+    // in quel momento: la decide il tab attivo.
+    const activeTabId = $('.tabs a.active').data('tab') || 'tab-summary';
+    const params = currentFilters();
+    if (INTERNAL_TOKEN) params.set('token', INTERNAL_TOKEN);
+
+    // --- Tab dettaglio prodotti (dinamico: tab-pd-XXX) -------------------
+    if (typeof activeTabId === 'string' && activeTabId.indexOf('tab-pd-') === 0) {
+        const state = productTabs[activeTabId];
+        if (!state) return;
+        // Il contesto del breadcrumb deve SOVRASCRIVERE i filtri multi-select,
+        // perche' il tab e' scoped a quel ramo (macrocat > cate2 > ...).
+        ['macrocat', 'cate2', 'cate3', 'marca'].forEach(k => {
+            params.delete(k);
+            if (state.ctx && state.ctx[k]) params.set(k, state.ctx[k]);
+        });
+        params.set('sort_by',  state.sort_by  || 'turnover');
+        params.set('sort_dir', state.sort_dir || 'desc');
+        if (state.split_on) {
+            params.set('view',   'split');
+            params.set('metric', state.split_metric || 'turnover');
+            (state.expandedMktps || new Set()).forEach(
+                m => params.append('expanded', m)
+            );
+        } else {
+            params.set('view', 'flat');
+        }
+        window.location.href =
+            `${API_BASE}/turnover/product-list.xlsx?${params.toString()}`;
+        return;
+    }
+
+    // --- Riepilogo / Marketplace / Trend / Geo ---------------------------
+    // Rispetta lo split della vista principale (attivo solo sul Riepilogo).
+    if (splitState.on && activeTabId === 'tab-summary') {
+        params.set('view', 'split');
+        params.set('metric', $('#split-metric').val() || 'turnover');
+        splitState.expandedMktps.forEach(m => params.append('expanded', m));
+    } else {
+        params.set('view', 'flat');
+    }
+    window.location.href = `${API_BASE}/turnover/export.xlsx?${params.toString()}`;
+}
+
+// ---------------------------------------------------------------------------
+// SPLIT PER MARKETPLACE (pivot)
+// ---------------------------------------------------------------------------
+
+const splitState = {
+    on: false,
+    summaryData: null, // ultimo payload summary-by-marketplace ricevuto
+    expandedMktps: new Set(),  // nomi marketplace con colonna aperta. '__TOTAL__' = colonna Totale
+};
+
+const fornitoriState = {
+    on: false,
+    splitData: null,
+    expandedMktps: new Set(),
+};
+
+const METRIC_LABEL = {
+    turnover:     'Fatturato',
+    qta:          'Pezzi',
+    prezzo_medio: 'Prezzo medio',
+    costo:        'Costo',
+    margine_pct:  'Margine %',
+};
+const METRIC_LABEL_SHORT = {
+    turnover:     'Fatt.',
+    qta:          'Pezzi',
+    prezzo_medio: 'Pr.medio',
+    costo:        'Costo',
+    margine_pct:  'Marg.%',
+};
+const ALL_METRICS = ['qta', 'prezzo_medio', 'turnover', 'costo', 'margine_pct'];
+
+function formatMetric(metric, value) {
+    if (value == null) return '<span class="cell-zero">-</span>';
+    if (metric === 'qta')     return asInt(value);
+    if (metric === 'margine_pct') return asPct(value);
+    return asMoney(value);
+}
+
+function toggleSummarySplit() {
+    splitState.on = !splitState.on;
+    $('#btn-split').toggleClass('active', splitState.on);
+    $('.split-metric').toggle(splitState.on);
+    $('#btn-expand-all').toggle(splitState.on);
+    loadSummary();
+}
+
+// Aggiorna etichetta e visibilit\u00e0 del pulsante "Espandi/Comprimi tutti".
+function updateExpandAllBtn($btn, mktps, expanded) {
+    if (!$btn || !$btn.length) return;
+    if (!mktps || mktps.length === 0) {
+        $btn.hide();
+        return;
+    }
+    $btn.show();
+    const all = mktps.concat(['__TOTAL__']);
+    const isAllExp = all.every(m => expanded.has(m));
+    $btn.text(isAllExp ? 'Comprimi tutti' : 'Espandi tutti');
+}
+
+function onExpandAllSummary() {
+    const mktps = (splitState.summaryData && splitState.summaryData.marketplaces) || [];
+    if (mktps.length === 0) return;
+    const all = mktps.concat(['__TOTAL__']);
+    const isAllExp = all.every(m => splitState.expandedMktps.has(m));
+    if (isAllExp) {
+        splitState.expandedMktps.clear();
+    } else {
+        splitState.expandedMktps = new Set(all);
+    }
+    renderSplitSummary();
+}
+
+function renderSplitSummary() {
+    const data = splitState.summaryData;
+    if (!data) return;
+    const metric = $('#split-metric').val() || 'turnover';
+    const mktps = data.marketplaces || [];
+    const $wrap = $('#summary-wrap').empty();
+
+    const $tbl = $('<table class="report pivot"></table>');
+    const $thead = buildPivotThead('Macro categoria', mktps, metric,
+        splitState.expandedMktps,
+        (m) => {
+            if (splitState.expandedMktps.has(m)) splitState.expandedMktps.delete(m);
+            else splitState.expandedMktps.add(m);
+            renderSplitSummary();
+        });
+    $tbl.append($thead);
+
+    const $tb = $('<tbody></tbody>');
+
+    // riga TOTALE in alto
+    const totRow = data.total_row || { cells: {}, total: {} };
+    $tb.append(makePivotRow('TOTALE', totRow, mktps, metric,
+                            { cls: 'total', lensCtx: null, dataAttrs: {} }));
+
+    // righe per macrocat
+    (data.rows || []).forEach(r => {
+        const ctx = { macrocat: r.macrocat };
+        const $tr = makePivotRow(r.macrocat, r, mktps, metric, {
+            cls: 'expandable',
+            lensCtx: ctx,
+            dataAttrs: { macrocat: r.macrocat },
+        });
+        $tr.on('click', onExpandMacrocatSplit);
+        $tb.append($tr);
+    });
+
+    $tbl.append($tb);
+    $wrap.append($tbl);
+
+    updateExpandAllBtn($('#btn-expand-all'), mktps, splitState.expandedMktps);
+}
+
+function makePivotRow(label, rowData, mktps, metric, opts) {
+    opts = opts || {};
+    const expanded = opts.expanded || splitState.expandedMktps;
+    const $tr = $(`<tr class="${opts.cls || ''}"></tr>`);
+    const $label = $('<td class="text"></td>').text(label);
+    if (opts.lensCtx) {
+        const $lens = $('<span class="row-lens" title="Vedi dettaglio prodotti">\uD83D\uDD0D</span>');
+        $lens.on('click', (e) => { e.stopPropagation(); openProductDetail(opts.lensCtx); });
+        $label.append($lens);
+    }
+    $tr.append($label);
+    const cells = rowData.cells || {};
+    mktps.forEach(m => {
+        const cell = cells[m] || {};
+        if (expanded.has(m)) {
+            ALL_METRICS.forEach((mk, idx) => {
+                const cls = 'mktp-sub' +
+                            (idx === 0 ? ' sub-first' : '') +
+                            (idx === ALL_METRICS.length - 1 ? ' sub-last' : '');
+                $tr.append(`<td class="${cls}">${formatMetric(mk, cell[mk])}</td>`);
+            });
+        } else {
+            $tr.append(`<td>${formatMetric(metric, cell[metric])}</td>`);
+        }
+    });
+    // colonna Totale (espandibile con chiave speciale __TOTAL__)
+    const tot = rowData.total || {};
+    if (expanded.has('__TOTAL__')) {
+        ALL_METRICS.forEach((mk, idx) => {
+            const cls = 'col-total mktp-sub' +
+                        (idx === 0 ? ' sub-first' : '') +
+                        (idx === ALL_METRICS.length - 1 ? ' sub-last' : '');
+            $tr.append(`<td class="${cls}">${formatMetric(mk, tot[mk])}</td>`);
+        });
+    } else {
+        $tr.append(`<td class="col-total">${formatMetric(metric, tot[metric])}</td>`);
+    }
+    Object.entries(opts.dataAttrs || {}).forEach(([k, v]) => {
+        $tr.attr('data-' + k, v);
+    });
+    return $tr;
+}
+
+// Costruisce il thead di una tabella pivot con +/- per marketplace.
+// Usata sia nel riepilogo che nei tab di dettaglio prodotti.
+function buildPivotThead(labelCol, mktps, metric, expanded, onToggle) {
+    const hasExpanded =
+        mktps.some(m => expanded.has(m)) || expanded.has('__TOTAL__');
+    const $thead = $('<thead></thead>');
+    const $tr1 = $('<tr></tr>');
+    const rs = hasExpanded ? ' rowspan="2"' : '';
+    $tr1.append(
+        `<th style="text-align:left"${rs}>${escapeHtml(labelCol)} ` +
+        `<span style="color:var(--text-mute);font-weight:400;font-size:11px;">` +
+        `(metrica: ${escapeHtml(METRIC_LABEL[metric])})</span></th>`
+    );
+    mktps.forEach(m => {
+        const isExp = expanded.has(m);
+        const sym   = isExp ? '\u2212' : '+';
+        const title = isExp ? 'Comprimi' : 'Espandi';
+        const btn   = `<span class="mktp-toggle" data-mktp="${escapeHtml(m)}" ` +
+                      `title="${title}">${sym}</span>`;
+        if (isExp) {
+            $tr1.append(
+                `<th class="col-mktp col-mktp-grp" colspan="${ALL_METRICS.length}">` +
+                `${escapeHtml(m)} ${btn}</th>`
+            );
+        } else {
+            $tr1.append(
+                `<th class="col-mktp"${rs}>${escapeHtml(m)} ${btn}</th>`
+            );
+        }
+    });
+    // colonna Totale
+    const totExp = expanded.has('__TOTAL__');
+    const totSym = totExp ? '\u2212' : '+';
+    const totBtn = `<span class="mktp-toggle" data-mktp="__TOTAL__" ` +
+                   `title="${totExp ? 'Comprimi' : 'Espandi'}">${totSym}</span>`;
+    if (totExp) {
+        $tr1.append(
+            `<th class="col-total col-mktp-grp" colspan="${ALL_METRICS.length}">` +
+            `Totale ${totBtn}</th>`
+        );
+    } else {
+        $tr1.append(
+            `<th class="col-total"${rs}>Totale ${totBtn}</th>`
+        );
+    }
+    $thead.append($tr1);
+
+    if (hasExpanded) {
+        const $tr2 = $('<tr></tr>');
+        mktps.forEach(m => {
+            if (!expanded.has(m)) return;
+            ALL_METRICS.forEach((mk, idx) => {
+                const cls = 'col-mktp-sub' +
+                            (idx === 0 ? ' sub-first' : '') +
+                            (idx === ALL_METRICS.length - 1 ? ' sub-last' : '');
+                $tr2.append(`<th class="${cls}">${escapeHtml(METRIC_LABEL_SHORT[mk])}</th>`);
+            });
+        });
+        if (totExp) {
+            ALL_METRICS.forEach((mk, idx) => {
+                const cls = 'col-mktp-sub col-total' +
+                            (idx === 0 ? ' sub-first' : '') +
+                            (idx === ALL_METRICS.length - 1 ? ' sub-last' : '');
+                $tr2.append(`<th class="${cls}">${escapeHtml(METRIC_LABEL_SHORT[mk])}</th>`);
+            });
+        }
+        $thead.append($tr2);
+    }
+    // delega click sui toggle
+    $thead.on('click', '.mktp-toggle', function(e) {
+        e.stopPropagation();
+        const m = $(this).attr('data-mktp');
+        onToggle(m);
+    });
+    return $thead;
+}
+
+// --- drill-down in modalit\u00e0 split --------------------------------------------
+
+async function onExpandMacrocatSplit(e) {
+    e.stopPropagation();
+    const $row = $(this);
+    if ($row.hasClass('expanded')) {
+        $row.removeClass('expanded');
+        $row.nextUntil(':not(.drill)').remove();
+        return;
+    }
+    $row.addClass('expanded');
+    const macro = $row.data('macrocat');
+    const metric = $('#split-metric').val() || 'turnover';
+    const mktps = (splitState.summaryData && splitState.summaryData.marketplaces) || [];
+    const data = await api('/turnover/drilldown-by-marketplace/cate2', { macrocat: macro });
+    const rows = data.rows.length ? data.rows : [{ cate2: '(nessun dato)', cells: {}, total: {} }];
+    let $after = $row;
+    rows.forEach(r => {
+        const hasData = r.total && r.total.qta != null;
+        const ctx = hasData ? { macrocat: macro, cate2: r.cate2 } : null;
+        const $tr = makePivotRow(r.cate2, r, mktps, metric, {
+            cls: 'drill expandable lvl1',
+            lensCtx: ctx,
+            dataAttrs: { macrocat: macro, cate2: r.cate2 },
+        });
+        if (hasData) $tr.on('click', onExpandCate2Split);
+        $tr.insertAfter($after);
+        $after = $tr;
+    });
+}
+
+async function onExpandCate2Split(e) {
+    e.stopPropagation();
+    const $row = $(this);
+    if ($row.hasClass('expanded')) {
+        $row.removeClass('expanded');
+        $row.nextUntil(':not(.drill.lvl2, .drill.lvl3)').remove();
+        return;
+    }
+    $row.addClass('expanded');
+    const macro = $row.data('macrocat');
+    const cate2 = $row.data('cate2');
+    const metric = $('#split-metric').val() || 'turnover';
+    const mktps = (splitState.summaryData && splitState.summaryData.marketplaces) || [];
+    const data = await api('/turnover/drilldown-by-marketplace/cate3',
+        { macrocat: macro, cate2: cate2 });
+    const rows = data.rows.length ? data.rows : [{ cate3: '(nessun dato)', cells: {}, total: {} }];
+    let $after = $row;
+    rows.forEach(r => {
+        const hasData = r.total && r.total.qta != null;
+        const ctx = hasData ? { macrocat: macro, cate2: cate2, cate3: r.cate3 } : null;
+        const $tr = makePivotRow(r.cate3, r, mktps, metric, {
+            cls: 'drill expandable lvl2',
+            lensCtx: ctx,
+            dataAttrs: { macrocat: macro, cate2: cate2, cate3: r.cate3 },
+        });
+        if (hasData) $tr.on('click', onExpandCate3Split);
+        $tr.insertAfter($after);
+        $after = $tr;
+    });
+}
+
+async function onExpandCate3Split(e) {
+    e.stopPropagation();
+    const $row = $(this);
+    if ($row.hasClass('expanded')) {
+        $row.removeClass('expanded');
+        $row.nextUntil(':not(.drill.lvl3)').remove();
+        return;
+    }
+    $row.addClass('expanded');
+    const macro = $row.data('macrocat');
+    const cate2 = $row.data('cate2');
+    const cate3 = $row.data('cate3');
+    const metric = $('#split-metric').val() || 'turnover';
+    const mktps = (splitState.summaryData && splitState.summaryData.marketplaces) || [];
+    const data = await api('/turnover/drilldown-by-marketplace/marca',
+        { macrocat: macro, cate2: cate2, cate3: cate3 });
+    const rows = data.rows.length ? data.rows : [{ marca: '(nessun dato)', cells: {}, total: {} }];
+    let $after = $row;
+    rows.forEach(r => {
+        const hasData = r.total && r.total.qta != null;
+        const ctx = hasData
+            ? { macrocat: macro, cate2: cate2, cate3: cate3, marca: r.marca } : null;
+        const $tr = makePivotRow(r.marca, r, mktps, metric, {
+            cls: 'drill lvl3',
+            lensCtx: ctx,
+            dataAttrs: {},
+        });
+        $tr.insertAfter($after);
+        $after = $tr;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// TAB DINAMICI + DETTAGLIO PRODOTTI
+// ---------------------------------------------------------------------------
+
+// Stato interno dei tab aperti: chiave -> { ctx, page, sort_by, sort_dir, lastData }
+const productTabs = {};
+
+function ctxKey(ctx) {
+    const parts = [];
+    ['macrocat', 'cate2', 'cate3', 'marca', 'fornitore'].forEach(k => {
+        if (ctx[k]) parts.push(`${k}=${ctx[k]}`);
+    });
+    return parts.join('&') || 'all';
+}
+
+function ctxBreadcrumb(ctx) {
+    const parts = [];
+    ['macrocat', 'cate2', 'cate3', 'marca'].forEach(k => {
+        if (ctx[k]) parts.push(ctx[k]);
+    });
+    if (ctx.fornitore) parts.push(`Fornitore: ${ctx.fornitore}`);
+    return parts;
+}
+
+function tabShortLabel(ctx) {
+    const parts = ctxBreadcrumb(ctx);
+    return parts.length ? parts[parts.length - 1] : 'Tutti';
+}
+
+function openProductDetail(ctx) {
+    const key = ctxKey(ctx);
+    const tabId = `tab-pd-${btoa(unescape(encodeURIComponent(key))).replace(/[=+/]/g, '')}`;
+
+    // esiste gi\u00e0? basta attivarlo
+    if (document.getElementById(tabId)) {
+        activateTab(tabId);
+        return;
+    }
+
+    // aggiungi nuovo link nella barra tabs
+    const label = tabShortLabel(ctx);
+    const $link = $(
+        `<a data-tab="${tabId}" class="closable">` +
+        `<span>\uD83D\uDD0D ${escapeHtml(label)}</span>` +
+        `<span class="tab-close" title="Chiudi">\u2715</span>` +
+        `</a>`
+    );
+    $link.on('click', function(e) {
+        if ($(e.target).hasClass('tab-close')) {
+            e.preventDefault();
+            closeProductTab(tabId);
+            return;
+        }
+        switchTab.call(this, e);
+    });
+    $('.tabs').append($link);
+
+    // aggiungi il pannello
+    const $panel = $(`<div id="${tabId}" class="tab-panel"></div>`);
+    $('#Content').append($panel);
+
+    productTabs[tabId] = {
+        ctx: ctx,
+        page: 1,
+        sort_by: 'turnover',
+        sort_dir: 'desc',
+        split_on: !!splitState.on,  // eredita lo stato dalla pagina principale
+        split_metric: $('#split-metric').val() || 'turnover',
+        // colonne marketplace espanse (indipendenti tra tab e pagina principale)
+        expandedMktps: new Set(splitState.expandedMktps),
+    };
+
+    activateTab(tabId);
+    loadProductList(tabId);
+}
+
+function activateTab(tabId) {
+    $('.tabs a').removeClass('active');
+    $(`.tabs a[data-tab="${tabId}"]`).addClass('active');
+    $('.tab-panel').removeClass('active');
+    $('#' + tabId).addClass('active');
+}
+
+function closeProductTab(tabId) {
+    const wasActive = $(`.tabs a[data-tab="${tabId}"]`).hasClass('active');
+    $(`.tabs a[data-tab="${tabId}"]`).remove();
+    $('#' + tabId).remove();
+    delete productTabs[tabId];
+    if (wasActive) {
+        // torna a Riepilogo
+        $('.tabs a[data-tab="tab-summary"]').trigger('click');
+    }
+}
+
+async function loadProductList(tabId) {
+    const state = productTabs[tabId];
+    if (!state) return;
+    const $panel = $('#' + tabId);
+    $panel.html('<div class="loading">Caricamento dettaglio prodotti...</div>');
+
+    const endpoint = state.split_on
+        ? '/turnover/product-list-by-marketplace'
+        : '/turnover/product-list';
+
+    try {
+        const data = await api(endpoint, {
+            ...state.ctx,
+            page: state.page,
+            page_size: 500,
+            sort_by: state.sort_by,
+            sort_dir: state.sort_dir,
+        });
+        state.lastData = data;
+        renderProductDetail($panel, tabId, data);
+    } catch (e) {
+        $panel.html(`<div class="loading neg">Errore: ${escapeHtml(e.message)}</div>`);
+    }
+}
+
+function renderProductDetail($panel, tabId, data) {
+    const state = productTabs[tabId];
+    const crumbs = ctxBreadcrumb(state.ctx);
+    const crumbHtml = crumbs.length
+        ? crumbs.map(c => `<span>${escapeHtml(c)}</span>`).join('<span class="sep">\u203A</span>')
+        : '<span>Tutti i prodotti</span>';
+
+    const range = $('#date-range').val();
+    const filtActive = [];
+    ($('#f-marketplace').val() || []).forEach(v => filtActive.push(`mkt:${v}`));
+    ($('#f-fornitore').val()   || []).forEach(v => filtActive.push(`forn:${v}`));
+    const filtDesc = filtActive.length ? ' | ' + filtActive.join(', ') : '';
+
+    const startRow = (state.page - 1) * data.page_size + 1;
+    const endRow   = Math.min(state.page * data.page_size, data.total_rows);
+
+    $panel.empty();
+    const $header = $(
+        `<div class="pd-header">
+            <div class="pd-crumb">${crumbHtml}</div>
+            <div class="pd-meta">Periodo: ${escapeHtml(range)}${escapeHtml(filtDesc)}</div>
+            <div class="pd-meta">${fmtInt.format(data.total_rows)} prodotti</div>
+        </div>`
+    );
+    $panel.append($header);
+
+    // Barra split/metrica specifica del tab (indipendente dalla pagina principale)
+    const $splitBar = $(
+        `<div class="split-bar">
+            <button class="split-toggle pd-split-btn ${state.split_on ? 'active' : ''}" type="button">Split per marketplace</button>
+            <label class="pd-split-metric" style="${state.split_on ? '' : 'display:none;'}">
+                Metrica:
+                <select class="pd-split-metric-sel">
+                    <option value="turnover">Fatturato</option>
+                    <option value="qta">Pezzi</option>
+                    <option value="prezzo_medio">Prezzo medio</option>
+                    <option value="costo">Costo</option>
+                    <option value="margine_pct">Margine %</option>
+                </select>
+            </label>
+            <button class="btn-expand-all pd-expand-all" type="button"
+                    style="${state.split_on ? '' : 'display:none;'}">Espandi tutti</button>
+        </div>`
+    );
+    $splitBar.find('.pd-split-metric-sel').val(state.split_metric || 'turnover');
+    $splitBar.find('.pd-split-btn').on('click', () => {
+        state.split_on = !state.split_on;
+        state.page = 1;
+        loadProductList(tabId);
+    });
+    $splitBar.find('.pd-split-metric-sel').on('change', function() {
+        state.split_metric = $(this).val();
+        renderProductDetail($panel, tabId, state.lastData);
+    });
+    $splitBar.find('.pd-expand-all').on('click', () => {
+        const mktps = (state.lastData && state.lastData.marketplaces) || [];
+        if (mktps.length === 0) return;
+        const all = mktps.concat(['__TOTAL__']);
+        const isAllExp = all.every(m => state.expandedMktps.has(m));
+        if (isAllExp) state.expandedMktps.clear();
+        else state.expandedMktps = new Set(all);
+        renderProductDetail($panel, tabId, state.lastData);
+    });
+    $panel.append($splitBar);
+
+    if (!data.rows.length) {
+        $panel.append('<div class="loading">Nessun prodotto nel periodo/filtri selezionati.</div>');
+        return;
+    }
+
+    if (state.split_on) {
+        renderProductPivotTable($panel, tabId, data);
+        return;
+    }
+
+    const cols = [
+        { key: 'codice',         label: 'Codice / Prodotto', type: 'codice-nome', sortable: true },
+        { key: 'marca',          label: 'Marca',        type: 'text',      sortable: true },
+        { key: 'macrocat',       label: 'Macro',        type: 'text' },
+        { key: 'cate2',          label: 'Categoria',    type: 'text' },
+        { key: 'cate3',          label: 'Sotto-cat.',   type: 'text' },
+        { key: 'fornitori',      label: 'Fornitori',    type: 'text' },
+        { key: 'marketplaces',   label: 'Marketplace',  type: 'text' },
+        { key: 'qta',            label: 'Pezzi',        type: 'int',   sortable: true },
+        { key: 'ordini',         label: 'Ordini',       type: 'int',   sortable: true },
+        { key: 'giorni_attivita',label: 'Giorni venduti', type: 'int' },
+        { key: 'prezzo_medio',   label: 'Prezzo medio', type: 'money' },
+        { key: 'turnover',       label: 'Fatturato',    type: 'money', sortable: true },
+        { key: 'costo',          label: 'Costo',        type: 'money', sortable: true },
+        { key: 'margine_pct',    label: 'Margine %',    type: 'pct' },
+        { key: 'first_order',    label: 'Primo ordine', type: 'date' },
+        { key: 'last_order',     label: 'Ultimo ordine',type: 'date', sortable: true },
+    ];
+
+    const $tbl = $('<table class="pd-table"></table>');
+    const $thead = $('<thead><tr></tr></thead>');
+    const $trh = $thead.find('tr');
+    cols.forEach(c => {
+        let cls = '';
+        if (c.sortable && state.sort_by === c.key) {
+            cls = state.sort_dir === 'asc' ? 'sorted-asc' : 'sorted-desc';
+        }
+        const $th = $(`<th class="${cls}">${escapeHtml(c.label)}</th>`);
+        if (c.sortable) {
+            $th.css('cursor', 'pointer').on('click', () => {
+                if (state.sort_by === c.key) {
+                    state.sort_dir = state.sort_dir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    state.sort_by = c.key;
+                    state.sort_dir = (c.type === 'text' || c.type === 'text-mono') ? 'asc' : 'desc';
+                }
+                state.page = 1;
+                loadProductList(tabId);
+            });
+        }
+        $trh.append($th);
+    });
+    $tbl.append($thead);
+
+    const $tbody = $('<tbody></tbody>');
+    data.rows.forEach(r => {
+        const $tr = $('<tr></tr>');
+        cols.forEach(c => {
+            let v = r[c.key];
+            let td;
+            switch (c.type) {
+                case 'int':   td = `<td>${asInt(v)}</td>`; break;
+                case 'money': td = `<td>${asMoney(v)}</td>`; break;
+                case 'pct':   td = `<td>${asPct(v)}</td>`; break;
+                case 'date':
+                    td = `<td>${escapeHtml((v || '').substring(0, 16))}</td>`; break;
+                case 'codice-nome':
+                    td = `<td class="text">` +
+                         `<span class="mono" style="font-size:11px;display:block;color:#c9d6ee;">${escapeHtml(v || '')}</span>` +
+                         `<span style="font-size:11.5px;color:var(--text-mute);">${escapeHtml(r.nome || '')}</span>` +
+                         `</td>`; break;
+                case 'text-mono':
+                    td = `<td class="text mono">${escapeHtml(v || '')}</td>`; break;
+                default:
+                    td = `<td class="text">${escapeHtml(v || '')}</td>`;
+            }
+            $tr.append(td);
+        });
+        $tbody.append($tr);
+    });
+    $tbl.append($tbody);
+
+    // paginazione sopra e sotto; tabella wrapped in .table-scroll per mobile
+    $panel.append(makePager(tabId, data, startRow, endRow));
+    $panel.append($('<div class="table-scroll"></div>').append($tbl));
+    $panel.append(makePager(tabId, data, startRow, endRow));
+}
+
+function renderProductPivotTable($panel, tabId, data) {
+    const state = productTabs[tabId];
+    if (!state.expandedMktps) state.expandedMktps = new Set();
+    const metric = state.split_metric || 'turnover';
+    const mktps = data.marketplaces || [];
+    const expanded = state.expandedMktps;
+
+    const startRow = (state.page - 1) * data.page_size + 1;
+    const endRow   = Math.min(state.page * data.page_size, data.total_rows);
+
+    const $tbl = $('<table class="pd-table pivot"></table>');
+    const $thead = buildPivotThead('Prodotto', mktps, metric, expanded, (m) => {
+        if (expanded.has(m)) expanded.delete(m); else expanded.add(m);
+        // re-render solo la tabella dal lastData, senza rifare la query
+        renderProductDetail($panel, tabId, state.lastData);
+    });
+    $tbl.append($thead);
+
+    const $tb = $('<tbody></tbody>');
+    data.rows.forEach(r => {
+        const $tr = $('<tr></tr>');
+        $tr.append(
+            `<td class="text mono">${escapeHtml(r.codice || '')} ` +
+            `<span style="color:var(--text-mute);">\u2014 ${escapeHtml(r.nome || '')}</span></td>`
+        );
+        const cells = r.cells || {};
+        mktps.forEach(m => {
+            const cell = cells[m] || {};
+            if (expanded.has(m)) {
+                ALL_METRICS.forEach((mk, idx) => {
+                    const cls = 'mktp-sub' +
+                                (idx === 0 ? ' sub-first' : '') +
+                                (idx === ALL_METRICS.length - 1 ? ' sub-last' : '');
+                    $tr.append(`<td class="${cls}">${formatMetric(mk, cell[mk])}</td>`);
+                });
+            } else {
+                $tr.append(`<td>${formatMetric(metric, cell[metric])}</td>`);
+            }
+        });
+        // totale riga: le metriche sono su r stesso (gia' aggregate)
+        if (expanded.has('__TOTAL__')) {
+            ALL_METRICS.forEach((mk, idx) => {
+                const cls = 'col-total mktp-sub' +
+                            (idx === 0 ? ' sub-first' : '') +
+                            (idx === ALL_METRICS.length - 1 ? ' sub-last' : '');
+                $tr.append(`<td class="${cls}">${formatMetric(mk, r[mk])}</td>`);
+            });
+        } else {
+            $tr.append(`<td class="col-total">${formatMetric(metric, r[metric])}</td>`);
+        }
+        $tb.append($tr);
+    });
+    $tbl.append($tb);
+
+    $panel.append(makePager(tabId, data, startRow, endRow));
+    $panel.append($('<div class="table-scroll"></div>').append($tbl));
+    $panel.append(makePager(tabId, data, startRow, endRow));
+
+    updateExpandAllBtn($panel.find('.pd-expand-all'), mktps, expanded);
+}
+
+function makePager(tabId, data, startRow, endRow) {
+    const state = productTabs[tabId];
+    const $pg = $('<div class="pd-pager"></div>');
+    const $prev = $('<button>\u00AB Prec.</button>').prop('disabled', state.page <= 1);
+    const $next = $('<button>Succ. \u00BB</button>')
+        .prop('disabled', state.page >= (data.pages || 1));
+    $prev.on('click', () => { if (state.page > 1) { state.page--; loadProductList(tabId); } });
+    $next.on('click', () => { if (state.page < data.pages) { state.page++; loadProductList(tabId); } });
+
+    const $input = $(`<input type="number" min="1" max="${data.pages||1}" value="${state.page}">`);
+    $input.on('change', () => {
+        const v = Math.max(1, Math.min(data.pages || 1, parseInt($input.val(), 10) || 1));
+        state.page = v;
+        loadProductList(tabId);
+    });
+
+    $pg.append($prev)
+        .append(`<span>Pagina </span>`).append($input)
+        .append(`<span> di ${data.pages || 1}</span>`)
+        .append(`<span> \u00B7 righe ${startRow}\u2013${endRow} di ${fmtInt.format(data.total_rows)}</span>`)
+        .append($next);
+    return $pg;
+}
+</script>
+</body>
+</html>

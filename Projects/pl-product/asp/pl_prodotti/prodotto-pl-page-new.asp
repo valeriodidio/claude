@@ -1,0 +1,1398 @@
+<%@ Language="VBScript" CodePage="65001" %>
+<!--#include virtual="/admin/int/prima.asp"-->
+<!--#include virtual="/admin/int/menu.asp"-->
+<%
+Response.CodePage = 65001
+Response.Charset  = "UTF-8"
+
+' ============================================================
+' P&L Prodotti — admin Yeppon
+' Chiama il backend Python su http://127.0.0.1:8000
+' ============================================================
+Server.ScriptTimeout = 300
+
+Const INTERNAL_TOKEN = "change_me_long_random_string"
+Const REPORTS_BASE   = "/api/reports/pl_prodotti"
+%>
+<!doctype html>
+<meta charset="utf-8">
+<title>P&L Prodotti</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/css/select2.min.css">
+<style>
+/* ── DARK THEME ─────────────────────────────────────────────────────────── */
+:root {
+    --bg:          #0f1624;
+    --bg-elev:     #182235;
+    --bg-elev2:    #1f2b41;
+    --bg-row-a:    #141d2e;   /* riga zebra scura */
+    --bg-row-b:    #1d2d47;   /* riga zebra chiara (contrasto visibile) */
+    --bg-expanded: #35527f;
+    --bg-hover:    #2e4370;
+    --bg-drill1:   #40608f;
+    --border:      #2c3a55;
+    --border-soft: #243149;
+    --text:        #e5eaf3;
+    --text-mute:   #9aa7bd;
+    --text-dim:    #6f7d96;
+    --accent:      #4f8cff;
+    --accent-2:    #6aa1ff;
+    --warn-bg:     #3a2f12;
+    --warn-bd:     #6b5116;
+    --warn-fg:     #f5d27a;
+    --neg:         #ff6b6b;
+    --neg-bg:      rgba(255,107,107,.13);
+    --pos:         #4ade80;
+    --pos-bg:      rgba(74,222,128,.11);
+    --yellow:      #fbbf24;
+    --yellow-bg:   rgba(251,191,36,.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+       background: var(--bg); color: var(--text); font-size: 13px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── BANNER DEV ─────────────────────────────────────────────────────────── */
+.dev-banner { background: var(--warn-bg); color: var(--warn-fg);
+              padding: 6px 14px; font-size: 12px;
+              border-bottom: 1px solid var(--warn-bd); }
+
+#Content { padding: 16px; }
+
+h1 { font-size: 18px; font-weight: 600; margin-bottom: 14px; }
+h1 small { font-size: 12px; color: var(--text-mute); font-weight: normal; }
+
+/* ── FILTER BAR ─────────────────────────────────────────────────────────── */
+.filter-bar { background: var(--bg-elev); border: 1px solid var(--border);
+              border-radius: 6px; padding: 12px 14px; margin-bottom: 12px; }
+.filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.filter-row + .filter-row { margin-top: 10px; padding-top: 10px;
+                             border-top: 1px solid var(--border-soft); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+label { font-size: 11px; text-transform: uppercase; color: var(--text-mute);
+        letter-spacing: .04em; }
+input, select {
+    padding: 5px 9px; font-size: 12px; background: var(--bg-elev2);
+    border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+    height: 30px;
+}
+input[type="checkbox"] { width: auto; height: auto; }
+input::placeholder { color: var(--text-dim); }
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+button { padding: 5px 14px; font-size: 12px; border-radius: 4px; cursor: pointer;
+         border: none; font-family: inherit; height: 30px; }
+button.primary   { background: var(--accent);   color: #fff; }
+button.primary:hover   { background: var(--accent-2); }
+button.secondary { background: var(--bg-elev2); color: var(--text);
+                   border: 1px solid var(--border); }
+button.secondary:hover { background: var(--bg-hover); }
+.checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer;
+                  font-size: 12px; color: var(--text-mute); padding-bottom: 4px; }
+#snapshot-info { font-size: 11px; color: var(--text-dim); line-height: 30px; }
+
+/* ── KPI ROW ─────────────────────────────────────────────────────────────── */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+           gap: 8px; margin-bottom: 12px; }
+.kpi { background: var(--bg-elev); border: 1px solid var(--border);
+       border-radius: 6px; padding: 10px 12px; }
+.kpi .lbl { font-size: 10px; text-transform: uppercase; color: var(--text-mute);
+             letter-spacing: .04em; }
+.kpi .val { font-size: 18px; font-weight: 600; margin-top: 3px; color: var(--text); }
+.kpi .val.pos { color: var(--pos); }
+.kpi .val.neg { color: var(--neg); }
+
+/* ── TABLE.REPORT ───────────────────────────────────────────────────────── */
+.tbl-wrap { overflow-x: auto; overflow-y: auto;
+            border-radius: 6px; border: 1px solid var(--border); }
+table.report { border-collapse: collapse; width: 100%; background: var(--bg-elev); }
+table.report thead tr th {
+    background: var(--bg-elev2); color: var(--text-mute);
+    font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 7px 8px; text-align: right; position: sticky; top: 0; z-index: 2;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+table.report th.text { text-align: left; }
+table.report thead th.sortable { cursor: pointer; user-select: none; }
+table.report thead th.sortable:hover { color: var(--text); background: var(--bg-hover); }
+table.report thead th.sortable::after { content: ' ⇅'; opacity: .3; font-size: 9px; }
+table.report thead th.sort-asc::after  { content: ' ▲'; opacity: 1; color: var(--accent); }
+table.report thead th.sort-desc::after { content: ' ▼'; opacity: 1; color: var(--accent); }
+table.report td { padding: 4px 8px; font-size: 12px; text-align: right;
+                  border-bottom: 1px solid var(--border-soft); }
+table.report td.text { text-align: left; }
+table.report tbody tr.expandable:nth-child(odd)  td { background: var(--bg-row-a); }
+table.report tbody tr.expandable:nth-child(even) td { background: var(--bg-row-b); }
+table.report tr.expandable td.drill-link { cursor: pointer; }
+table.report tr.expandable.expanded td { background: var(--bg-expanded) !important; }
+
+/* ── DRILL ROW (contenitore detail box) ──────────────────────────────────── */
+table.report tr.drill-row td {
+    padding: 0; border-bottom: 2px solid var(--accent);
+    background: var(--bg) !important;
+}
+
+/* ── DETAIL BOX ─────────────────────────────────────────────────────────── */
+.detail-box { background: var(--bg-elev); border-left: 3px solid var(--accent);
+              padding: 14px 16px; }
+.detail-box .dd-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.detail-box .dd-meta  { font-size: 11px; color: var(--text-mute); margin-bottom: 10px; }
+
+.detail-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.detail-tabs button {
+    font-size: 11px; padding: 4px 10px;
+    background: var(--bg-elev2); color: var(--text-mute);
+    border: 1px solid var(--border); border-radius: 3px; height: auto;
+}
+.detail-tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.detail-panel { display: none; }
+.detail-panel.active { display: block; }
+.detail-box table { box-shadow: none; border: 1px solid var(--border);
+                    width: 100%; background: var(--bg);
+                    border-collapse: collapse; }
+.detail-box table th { background: var(--bg-elev2); color: var(--text-mute);
+                        font-size: 10px; padding: 5px 7px; text-align: right;
+                        border-bottom: 1px solid var(--border); }
+.detail-box table th.text { text-align: left; }
+.detail-box table td { font-size: 11px; padding: 3px 7px; text-align: right;
+                        border-bottom: 1px solid var(--border-soft); }
+.detail-box table td.text { text-align: left; }
+.detail-box table tbody tr:nth-child(odd)  td { background: var(--bg-row-a); }
+.detail-box table tbody tr:nth-child(even) td { background: var(--bg-row-b); }
+.detail-box table tr:hover td { background: var(--bg-hover) !important; }
+.loading   { color: var(--text-dim); font-style: italic; padding: 8px 0; font-size: 12px; }
+.err-inline { color: var(--neg); font-size: 12px; padding: 4px 0; }
+
+/* ── CELLE VALORE COLORATE ──────────────────────────────────────────────── */
+.green  { background: var(--pos-bg)    !important; color: var(--pos)    !important; }
+.yellow { background: var(--yellow-bg) !important; color: var(--yellow) !important; }
+.red    { background: var(--neg-bg)    !important; color: var(--neg)    !important; }
+
+/* Celle cliccabili (drill diretto su tab) */
+td.drill-link { text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+td.drill-link:hover { filter: brightness(1.25); }
+
+/* ── LAYOUT PRINCIPALE (tabella + panel grafici) ─────────────────────── */
+.main-layout { display: flex; gap: 12px; align-items: flex-start; }
+.tbl-section  { flex: 1; min-width: 0; }
+.chart-panel  { width: 270px; flex-shrink: 0; display: flex; flex-direction: column;
+                gap: 10px; position: sticky; top: 0; max-height: 100vh; overflow-y: auto;
+                padding-bottom: 8px; }
+.chart-card   { background: var(--bg-elev); border: 1px solid var(--border);
+                border-radius: 6px; padding: 12px; }
+.chart-card .cc-title { font-size: 10px; text-transform: uppercase; color: var(--text-mute);
+                        letter-spacing: .05em; margin-bottom: 8px; font-weight: 600; }
+.chart-card canvas    { max-width: 100%; }
+
+/* ── PAGER ──────────────────────────────────────────────────────────────── */
+.pager { padding: 8px 2px; font-size: 12px; color: var(--text-mute);
+         display: flex; gap: 8px; align-items: center; }
+.pager small { color: var(--text-dim); }
+
+/* ── ERRORE ─────────────────────────────────────────────────────────────── */
+#errBox .err { background: var(--neg-bg); color: var(--neg);
+               border: 1px solid var(--neg); padding: 8px 12px;
+               border-radius: 4px; margin: 8px 0; font-size: 12px; }
+
+/* ── SEZIONE MARKETPLACE ────────────────────────────────────────────────── */
+#marketplace-section { margin-top: 16px; }
+#marketplace-section .section-hdr {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    padding: 0 0 10px 0; border-bottom: 2px solid var(--accent);
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+#marketplace-section .section-hdr small {
+    font-size: 11px; color: var(--text-mute); font-weight: normal;
+}
+.mktp-layout { display: flex; gap: 14px; align-items: flex-start; }
+.mktp-chart-wrap { width: 340px; flex-shrink: 0; background: var(--bg-elev);
+                   border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+.mktp-chart-wrap .cc-title { font-size: 10px; text-transform: uppercase;
+                              color: var(--text-mute); letter-spacing: .05em; margin-bottom: 10px; }
+.mktp-table-wrap { flex: 1; min-width: 0; overflow-x: auto; }
+.mktp-bar { height: 3px; border-radius: 2px; margin-top: 3px; background: var(--border-soft); }
+.mktp-bar-inner { height: 100%; border-radius: 2px; background: var(--accent); }
+
+/* ── SELECT2 DARK ───────────────────────────────────────────────────────── */
+.select2-container--default .select2-selection--single {
+    background: var(--bg-elev2); border-color: var(--border);
+    border-radius: 4px; height: 30px; }
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    color: var(--text); line-height: 28px; padding-left: 9px; }
+.select2-container--default .select2-selection--single .select2-selection__arrow { top: 3px; }
+.select2-dropdown { background: var(--bg-elev2); border-color: var(--border); color: var(--text); }
+.select2-results__option { color: var(--text); font-size: 12px; }
+.select2-container--default .select2-results__option--highlighted { background: var(--accent) !important; }
+.select2-search__field { background: var(--bg-elev2) !important; color: var(--text) !important;
+                          border-color: var(--border) !important; }
+</style>
+
+
+<div id="Content">
+<h1>P&amp;L Prodotti</h1>
+
+<!-- ── FILTRI ─────────────────────────────────────────────────────────── -->
+<div class="filter-bar">
+  <div class="filter-row">
+    <div class="field">
+      <label>Periodo di analisi</label>
+      <select id="f-periodo" style="width:130px">
+        <option value="30">30 giorni</option>
+        <option value="60">60 giorni</option>
+        <option value="90" selected>90 giorni</option>
+        <option value="120">120 giorni</option>
+        <option value="180">180 giorni</option>
+        <option value="360">360 giorni</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Data snapshot</label>
+      <select id="f-snapshot" style="width:160px">
+        <option value="">— ultima disponibile —</option>
+      </select>
+    </div>
+    <div class="field">
+      <div id="snapshot-info">—</div>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <div class="field">
+      <label>Cerca</label>
+      <input id="f-search" placeholder="codice / nome / id_p" style="width:160px">
+    </div>
+    <div class="field">
+      <label>Marca</label>
+      <select id="f-marca" style="width:190px"><option value="">— tutte —</option></select>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="f-status" style="width:110px">
+        <option value="">— tutti —</option>
+        <option value="1">Attivo</option>
+        <option value="0">Disattivo</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Bloccato</label>
+      <select id="f-bloccato" style="width:90px">
+        <option value="">— tutti —</option>
+        <option value="0">No</option>
+        <option value="1">Sì</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Min Fatturato (€)</label>
+      <input id="f-fatt" type="number" min="0" step="100" style="width:110px">
+    </div>
+    <div class="field">
+      <label>Min Ordini</label>
+      <input id="f-ordini" type="number" min="0" step="1" style="width:80px">
+    </div>
+    <div class="field">
+      <label class="checkbox-label" style="text-transform:none;letter-spacing:0">
+        <input id="f-neg" type="checkbox"> Solo margine negativo
+      </label>
+    </div>
+    <div class="field">
+      <label class="checkbox-label" style="text-transform:none;letter-spacing:0">
+        <input id="f-resi" type="checkbox"> Solo con resi
+      </label>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <div class="field">
+      <label>Ordina per</label>
+      <select id="f-sort" style="width:180px">
+        <option value="tot_fatturato">Fatturato</option>
+        <option value="tot_margine">Margine</option>
+        <option value="margine_effettivo">Margine effettivo</option>
+        <option value="perc_margine_eff">% Margine effettivo</option>
+        <option value="imp_eco_resi">Impatto resi</option>
+        <option value="qty_resi">Qty resi</option>
+        <option value="perc_resi">% resi</option>
+        <option value="delta_sped">Delta spedizioni</option>
+        <option value="num_ordini">N° ordini</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Direzione</label>
+      <select id="f-dir" style="width:90px">
+        <option value="desc">DESC</option>
+        <option value="asc">ASC</option>
+      </select>
+    </div>
+    <div class="field">
+      <button class="primary" id="btn-apply">Filtra</button>
+    </div>
+    <div class="field">
+      <button class="secondary" id="btn-export">Export Excel</button>
+    </div>
+  </div>
+</div>
+
+<div id="errBox"></div>
+<div class="kpi-row" id="kpis"></div>
+
+<div class="main-layout">
+
+  <!-- ── Tabella + pager ──────────────────────────────────────────────── -->
+  <div class="tbl-section">
+    <div class="tbl-wrap">
+      <table class="report" id="tbl"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="pager">
+      <span id="pageInfo"></span>
+      <small>▶ click su riga per dettaglio · <u>Δ Sped.</u> → corrieri · <u>Imp. Resi</u> → resi</small>
+    </div>
+  </div>
+
+  <!-- ── Panel grafici ────────────────────────────────────────────────── -->
+  <div class="chart-panel">
+
+    <div class="chart-card">
+      <div class="cc-title">Impatto resi per marketplace</div>
+      <div id="marketplaceWrap" style="overflow-y:auto; max-height:320px;">
+        <div id="marketplaceInner" style="position:relative;">
+          <canvas id="marketplaceChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="cc-title">Distribuzione % Marg. Eff.</div>
+      <canvas id="marginiChart" height="160"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="cc-title">Δ Sped. per corriere</div>
+      <div id="deltaCorrWrap" style="overflow-y:auto; max-height:280px;">
+        <div id="deltaCorrInner" style="position:relative;">
+          <canvas id="deltaCorrChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /main-layout -->
+
+<!-- ── Sezione marketplace (visibile solo con 1 prodotto o 1 marca) ─────── -->
+<div id="marketplace-section" style="display:none">
+  <div class="section-hdr">
+    Distribuzione Vendite per Marketplace
+    <small id="mktp-context">—</small>
+  </div>
+  <div class="mktp-layout">
+    <div class="mktp-chart-wrap">
+      <div class="cc-title">Pezzi venduti per marketplace</div>
+      <canvas id="mktpBarChart" height="220"></canvas>
+    </div>
+    <div class="mktp-table-wrap">
+      <table class="report" id="mktp-tbl">
+        <thead>
+          <tr>
+            <th class="text">Marketplace</th>
+            <th>N Ordini</th>
+            <th>Pezzi Venduti</th>
+            <th>% su Totale Pz.</th>
+            <th>Fatturato</th>
+            <th>% su Fatturato</th>
+            <th>Margine</th>
+            <th>% Margine</th>
+            <th>Δ Sped.</th>
+            <th>Resi</th>
+            <th>Imp. Resi</th>
+            <th>Marg. Eff.</th>
+            <th>% Marg. Eff.</th>
+          </tr>
+        </thead>
+        <tbody id="mktp-tbody">
+          <tr><td colspan="13" class="text" style="padding:12px;color:var(--text-dim)">Caricamento…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /Content -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ── Iniettati dal server ASP (non modificare) ────────────────────────────
+var INTERNAL_TOKEN = '<%=INTERNAL_TOKEN%>';
+var API_BASE       = '<%=REPORTS_BASE%>';
+var API = API_BASE;
+const $el = id => document.getElementById(id);
+
+// ── Formattazione numeri (standard Yeppon) ───────────────────────────────
+function fmtEur(v) {
+  if (v == null || isNaN(v)) return '—';
+  return '€ ' + Math.round(v).toLocaleString('it-IT');
+}
+function fmt(v) {
+  if (v == null || isNaN(v)) return '—';
+  return Math.round(v).toLocaleString('it-IT');
+}
+function fmtPct(v) {
+  if (v == null || isNaN(v)) return '—';
+  return Number(v).toFixed(1) + '%';
+}
+
+function pctClass(v, type) {
+  v = Number(v) || 0;
+  if (type === 'margine')     return v < 0 ? 'red' : v <= 10 ? 'yellow' : 'green';
+  if (type === 'delta')       return v >= 0 ? 'green' : 'red';
+  if (type === 'resi')        return v <= 2 ? 'green' : v <= 5 ? 'yellow' : 'red';
+  if (type === 'imp_resi')    return v > 0 ? 'red' : 'green';
+  if (type === 'margine_eff') return v < 0 ? 'red' : v <= 8 ? 'yellow' : 'green';
+  return '';
+}
+
+// ── GRAFICI ───────────────────────────────────────────────────────────────
+const CHART_DEFAULTS = {
+  color:  '#9aa7bd',
+  gridColor: '#2c3a55',
+  font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', size: 10 },
+};
+Chart.defaults.color = CHART_DEFAULTS.color;
+Chart.defaults.font  = CHART_DEFAULTS.font;
+
+let _charts = {};
+let _lastRows = [];
+let _lastKpi  = {};
+
+function _destroyChart(id) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+}
+
+// Donut 1 — Composizione P&L (margine eff. / delta sped negativo / impatto resi)
+function _drawPL(kpi) {
+  _destroyChart('plChart');
+  const k = kpi || {};
+  const margEff   = Math.max(0, k.margine_effettivo || 0);
+  const deltaCost = Math.abs(Math.min(0, k.delta_sped  || 0));  // costo sped (solo neg)
+  const impResi   = Math.max(0, k.imp_eco_resi        || 0);
+  const totale    = margEff + deltaCost + impResi;
+  if (totale === 0) return;
+  const ctx = $el('plChart');
+  if (!ctx) return;
+  _charts['plChart'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Margine Eff.', 'Δ Sped. (costo)', 'Imp. Resi'],
+      datasets: [{ data: [margEff, deltaCost, impResi],
+        backgroundColor: ['rgba(74,222,128,.75)','rgba(255,107,107,.75)','rgba(251,191,36,.75)'],
+        borderColor:     ['#4ade80','#ff6b6b','#fbbf24'],
+        borderWidth: 1 }]
+    },
+    options: {
+      responsive: true, cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } },
+        tooltip: { callbacks: {
+          label: c => ` ${c.label}: € ${Math.round(c.raw).toLocaleString('it-IT')}` } },
+      }
+    }
+  });
+}
+
+// Bar orizzontale — Impatto resi per marketplace (da resi_impatto_economico, dati reali)
+async function _drawMarketplace() {
+  _destroyChart('marketplaceChart');
+  const qs = buildParams();
+  let data;
+  try { data = await apiFetch('/resi', qs); } catch(e) { return; }
+
+  const rows = (data.per_marketplace || [])
+    .filter(r => (r.n_resi || 0) > 0)
+    .sort((a, b) => Math.abs(b.perdita_netta) - Math.abs(a.perdita_netta));
+  if (!rows.length) return;
+
+  const ctx = $el('marketplaceChart');
+  if (!ctx) return;
+  const barH = Math.min(380, Math.max(120, rows.length * 28));
+  $el('marketplaceInner').style.height = barH + 'px';
+
+  _charts['marketplaceChart'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.marketplace || '—'),
+      datasets: [{
+        label: 'Perdita netta (€)',
+        data: rows.map(r => Math.abs(r.perdita_netta)),
+        backgroundColor: '#ff6b6baa',
+        borderColor:     '#ff6b6b',
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      indexAxis: 'y',          // barre orizzontali → nomi leggibili
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: c => ` € ${Math.round(c.raw).toLocaleString('it-IT')}` } },
+      },
+      scales: {
+        x: { grid: { color: CHART_DEFAULTS.gridColor },
+             ticks: { color: CHART_DEFAULTS.color,
+                      callback: v => '€ ' + Math.round(v).toLocaleString('it-IT') } },
+        y: { grid: { display: false },
+             ticks: { color: CHART_DEFAULTS.color, font: { size: 11 } } },
+      }
+    }
+  });
+}
+
+// Bar — Distribuzione prodotti per fascia % margine effettivo
+function _drawMargini(rows) {
+  _destroyChart('marginiChart');
+  if (!rows.length) return;
+  const labels  = ['< 0%', '0–5%', '5–10%', '10–20%', '> 20%'];
+  const buckets = [0, 0, 0, 0, 0];
+  const colors  = ['#ff6b6b','#fbbf24','#9aa7bd','#4f8cff','#4ade80'];
+  for (const r of rows) {
+    const m = Number(r.perc_margine_eff) || 0;
+    if      (m <  0)  buckets[0]++;
+    else if (m <  5)  buckets[1]++;
+    else if (m < 10)  buckets[2]++;
+    else if (m < 20)  buckets[3]++;
+    else              buckets[4]++;
+  }
+  const ctx = $el('marginiChart');
+  if (!ctx) return;
+  _charts['marginiChart'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Prodotti', data: buckets,
+        backgroundColor: colors.map(c => c + 'aa'),
+        borderColor: colors, borderWidth: 1, borderRadius: 3 }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.raw} prodotti` } }
+      },
+      scales: {
+        x: { grid: { color: CHART_DEFAULTS.gridColor },
+             ticks: { color: CHART_DEFAULTS.color } },
+        y: { grid: { color: CHART_DEFAULTS.gridColor },
+             ticks: { color: CHART_DEFAULTS.color, precision: 0 } },
+      }
+    }
+  });
+}
+
+// Mappa corriere → paese (euristica su nomi comuni)
+function _corrToPaese(corriere) {
+  const c = (corriere || '').toLowerCase();
+  if (/\bfr\b|chronopost|colissimo|colis.priv|mondialrelay.*fr|dpd.fr|gls.fr/.test(c)) return 'Francia';
+  if (/\bde\b|hermes.*de|dpd.de|dhl.de|gls.de/.test(c))                               return 'Germania';
+  if (/\bes\b|correos|seur|mrw|nacex|tipsa/.test(c))                                   return 'Spagna';
+  if (/\bbe\b|bpost|dpd.be/.test(c))                                                   return 'Belgio';
+  if (/\bnl\b|postnl|dpd.nl/.test(c))                                                  return 'Olanda';
+  if (/\buk\b|royal.mail|evri|dpd.uk/.test(c))                                         return 'UK';
+  if (/\bpt\b|ctt|dpd.pt/.test(c))                                                     return 'Portogallo';
+  return 'Italia';   // BRT, SDA, Bartolini, GLS IT, ecc.
+}
+
+// Bar — Δ Spedizioni per paese (aggrega corrieri_summary per paese)
+async function _drawDeltaStato() {
+  _destroyChart('deltaStatoChart');
+  const periodo = $el('f-periodo').value || '90';
+  const snap    = $el('f-snapshot').value;
+  const qs = `periodo_giorni=${periodo}` + (snap ? `&data_snapshot=${snap}` : '');
+  let data;
+  try { data = await apiFetch('/corrieri_summary', qs); } catch(e) { return; }
+
+  const agg = {};
+  for (const r of data.rows || []) {
+    const paese = _corrToPaese(r.corriere);
+    agg[paese] = (agg[paese] || 0) + (r.delta_sped || 0);
+  }
+  const sorted = Object.entries(agg).sort((a, b) => a[1] - b[1]);
+  if (!sorted.length) return;
+
+  const labels  = sorted.map(([k]) => k);
+  const values  = sorted.map(([, v]) => Math.round(v));
+  const colors  = values.map(v => v >= 0 ? '#4ade80aa' : '#ff6b6baa');
+  const borders = values.map(v => v >= 0 ? '#4ade80'   : '#ff6b6b');
+
+  const ctx = $el('deltaStatoChart');
+  if (!ctx) return;
+  _charts['deltaStatoChart'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Δ Sped. (€)', data: values,
+        backgroundColor: colors, borderColor: borders,
+        borderWidth: 1, borderRadius: 3 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` € ${Math.round(c.raw).toLocaleString('it-IT')}` } }
+      },
+      scales: {
+        x: { grid: { color: CHART_DEFAULTS.gridColor }, ticks: { color: CHART_DEFAULTS.color,
+             callback: v => '€ ' + Math.round(v/1000) + 'k' } },
+        y: { grid: { display: false }, ticks: { color: CHART_DEFAULTS.color } },
+      }
+    }
+  });
+}
+
+// Bar — Δ Spedizioni per corriere (da API corrieri_summary)
+async function _drawDeltaCorr() {
+  _destroyChart('deltaCorrChart');
+  const periodo = $el('f-periodo').value || '90';
+  const snap    = $el('f-snapshot').value;
+  const qs = `periodo_giorni=${periodo}` + (snap ? `&data_snapshot=${snap}` : '');
+  let data;
+  try { data = await apiFetch('/corrieri_summary', qs); } catch(e) { return; }
+
+  const rows = (data.rows || []).filter(r => r.num_ordini > 0);
+  if (!rows.length) return;
+
+  // ordina per delta_sped ASC (peggiori prima)
+  rows.sort((a, b) => (a.delta_sped || 0) - (b.delta_sped || 0));
+
+  const ctx = $el('deltaCorrChart');
+  if (!ctx) return;
+  const barH = Math.min(300, Math.max(100, rows.length * 30));
+  $el('deltaCorrInner').style.height = barH + 'px';
+
+  const values = rows.map(r => Math.round(r.delta_sped || 0));
+  const colors = values.map(v => v >= 0 ? '#4ade80aa' : '#ff6b6baa');
+  const borders = values.map(v => v >= 0 ? '#4ade80' : '#ff6b6b');
+
+  _charts['deltaCorrChart'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.corriere),
+      datasets: [{ label: 'Δ Sped. (€)', data: values,
+        backgroundColor: colors, borderColor: borders,
+        borderWidth: 1, borderRadius: 3 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: c => ` € ${Math.round(c.raw).toLocaleString('it-IT')}` +
+                      ` · ${rows[c.dataIndex].num_ordini} ordini` } }
+      },
+      scales: {
+        x: { grid: { color: CHART_DEFAULTS.gridColor }, ticks: { color: CHART_DEFAULTS.color,
+             callback: v => '€ ' + Math.round(v/1000) + 'k' } },
+        y: { grid: { display: false }, ticks: { color: CHART_DEFAULTS.color, font: { size: 11 } } },
+      }
+    }
+  });
+}
+
+function updateCharts(rows, kpi) {
+  _lastRows = rows || _lastRows;
+  _lastKpi  = kpi  || _lastKpi;
+  _drawMarketplace();
+  _drawMargini(_lastRows);
+  _drawDeltaCorr();      // async — corrieri_summary
+  setTimeout(syncTableToCharts, 600); // dopo che i grafici sono renderizzati
+}
+
+// Allinea la tabella all'altezza del panel grafici
+function syncTableToCharts() {
+  const panel = document.querySelector('.chart-panel');
+  const wrap  = document.querySelector('.tbl-wrap');
+  if (!panel || !wrap) return;
+  const h = panel.getBoundingClientRect().height;
+  if (h > 100) wrap.style.maxHeight = h + 'px';
+}
+
+const COLS = [
+  ['codice',           'Codice',        'text', null],
+  ['nome',             'Nome',          'text', null],
+  ['marca',            'Marca',         'text', null],
+  ['num_ordini',       'Ord.',          null,   'num'],
+  ['tot_pezzi',        'Pz.',           null,   'num'],
+  ['tot_fatturato',    'Fatturato',     null,   'eur'],
+  ['tot_margine',      'Margine',       null,   'eur'],
+  ['perc_margine',     '% Marg.',       null,   'pct-margine'],
+  ['delta_sped',       'Δ Sped.',       null,   'eur-delta'],
+  ['qty_resi',         'Resi',          null,   'num'],
+  ['perc_resi',        '% Resi',        null,   'pct-resi'],
+  ['imp_eco_resi',     'Imp. Resi',     null,   'eur-imp_resi'],
+  ['margine_effettivo','Margine Eff.',  null,   'eur-margine_eff'],
+  ['perc_margine_eff', '% Marg. Eff.', null,   'pct-margine_eff'],
+];
+// COLS: [key, header, thClass, fmt]
+const N_COLS = COLS.length;
+// Colonne su cui il backend supporta ORDER BY (whitelist anti SQL-injection)
+const SORTABLE_COLS = new Set([
+  'codice','nome','marca',
+  'num_ordini','tot_pezzi',
+  'tot_fatturato','tot_margine','perc_margine',
+  'delta_sped','perc_delta_sped',
+  'qty_resi','perc_resi','imp_eco_resi',
+  'margine_effettivo','perc_margine_eff',
+]);
+
+let state = { page: 1, page_size: 99999, total: 0 };
+const expanded = new Set();
+
+function buildParams(extra) {
+  const p = new URLSearchParams();
+  p.append('periodo_giorni', $el('f-periodo').value || '180');
+  const snap = $el('f-snapshot').value; if (snap) p.append('data_snapshot', snap);
+  const search = $el('f-search').value.trim();  if (search)        p.append('search', search);
+  const marca  = $el('f-marca').value;          if (marca)         p.append('marca', marca);
+  const status = $el('f-status').value;         if (status !== '') p.append('status_prodotto', status);
+  const blocc  = $el('f-bloccato').value;       if (blocc  !== '') p.append('bloccato', blocc);
+  const fatt   = $el('f-fatt').value;           if (fatt)          p.append('min_fatturato', fatt);
+  const ordini = $el('f-ordini').value;         if (ordini)        p.append('min_ordini', ordini);
+  if ($el('f-neg').checked)  p.append('margine_negativo', 'true');
+  if ($el('f-resi').checked) p.append('solo_con_resi', 'true');
+  p.append('sort_by',   $el('f-sort').value);
+  p.append('sort_dir',  $el('f-dir').value);
+  p.append('page',      state.page);
+  p.append('page_size', state.page_size);
+  if (extra) for (const [k,v] of Object.entries(extra)) p.append(k,v);
+  return p.toString();
+}
+
+async function apiFetch(path, qs) {
+  const url = `${API}${path}` + (qs ? `?${qs}` : '');
+  const r = await fetch(url, { headers: { 'X-Internal-Token': INTERNAL_TOKEN } });
+  if (!r.ok) { const t = await r.text(); throw new Error(`HTTP ${r.status} [${url}]: ${t}`); }
+  return r.json();
+}
+
+function showErr(msg) { $el('errBox').innerHTML = `<div class="err">${msg}</div>`; }
+function clearErr()   { $el('errBox').innerHTML = ''; }
+
+function renderCell(key, thCls, cellFmt, v) {
+  const align = thCls === 'text' ? ' text' : '';
+
+  if (key === 'delta_sped') {
+    const cls = pctClass(v, 'delta');
+    return `<td class="${cls} drill-link" data-tab="corr">${fmtEur(v)}</td>`;
+  }
+  if (key === 'imp_eco_resi') {
+    const cls = pctClass(v, 'imp_resi');
+    return `<td class="${cls} drill-link" data-tab="resi">${fmtEur(v)}</td>`;
+  }
+  if (cellFmt === 'num')             return `<td>${fmt(v)}</td>`;
+  if (cellFmt === 'eur')             return `<td>${fmtEur(v)}</td>`;
+  if (cellFmt?.startsWith('pct-'))   return `<td class="${pctClass(v, cellFmt.slice(4))}">${fmtPct(v)}</td>`;
+  if (cellFmt?.startsWith('eur-'))   return `<td class="${pctClass(v, cellFmt.slice(4))}">${fmtEur(v)}</td>`;
+  return `<td class="${align}">${v ?? ''}</td>`;
+}
+
+// ── FILTRI ─────────────────────────────────────────────────────────────────
+async function loadFilters() {
+  try {
+    const data = await apiFetch('/filters');
+    const selSnap = $el('f-snapshot');
+    selSnap.innerHTML = '<option value="">— ultima disponibile —</option>';
+    for (const d of data.snapshots || []) {
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d; selSnap.appendChild(o);
+    }
+    if (data.periodi_giorni?.length) {
+      const selPer = $el('f-periodo');
+      const cur = selPer.value;
+      selPer.innerHTML = '';
+      for (const p of data.periodi_giorni) {
+        const o = document.createElement('option');
+        o.value = p; o.textContent = `${p} giorni`;
+        if (String(p) === cur) o.selected = true;
+        selPer.appendChild(o);
+      }
+      if (!selPer.value) { const o180 = selPer.querySelector('[value="180"]'); if (o180) o180.selected = true; }
+    }
+    const selMarca = $el('f-marca');
+    selMarca.innerHTML = '<option value="">— tutte —</option>';
+    for (const m of data.marca || []) {
+      const o = document.createElement('option'); o.value = m; o.textContent = m; selMarca.appendChild(o);
+    }
+    // Inizializza Select2 sulla marca
+    $('#f-marca').select2({ placeholder: '— tutte —', allowClear: true, width: '190px',
+      dropdownCssClass: 'select2-dark' });
+
+    const meta = data.meta || {};
+    if (meta.ultimo_snapshot)
+      $el('snapshot-info').textContent = `Ultimo snapshot: ${meta.ultimo_snapshot} · ${meta.n_snapshot} giorni`;
+  } catch(e) { showErr('Impossibile caricare i filtri: ' + e.message); }
+}
+
+// ── KPI ──────────────────────────────────────────────────────────────────
+async function loadKpis() {
+  try {
+    const data = await apiFetch('/summary', buildParams());
+    const k = data.kpi || {};
+    const items = [
+      ['Prodotti',        fmt(k.n_prodotti),         ''],
+      ['Fatturato',       fmtEur(k.tot_fatturato),   ''],
+      ['Margine',         fmtEur(k.tot_margine),      (k.tot_margine||0) < 0 ? 'neg' : 'pos'],
+      ['% Margine',       fmtPct(k.perc_margine),     (k.perc_margine||0) < 0 ? 'neg' : 'pos'],
+      ['Δ Sped.',         fmtEur(k.delta_sped),       (k.delta_sped||0)  < 0 ? 'neg' : 'pos'],
+      ['Imp. Resi',       fmtEur(k.imp_eco_resi),     (k.imp_eco_resi||0) > 0 ? 'neg' : 'pos'],
+      ['Marg. Effettivo', fmtEur(k.margine_effettivo),(k.margine_effettivo||0) < 0 ? 'neg' : 'pos'],
+      ['% Marg. Eff.',    fmtPct(k.perc_margine_eff), (k.perc_margine_eff||0) < 0 ? 'neg' : 'pos'],
+    ];
+    $el('kpis').innerHTML = items.map(([lbl, val, cls]) =>
+      `<div class="kpi"><div class="lbl">${lbl}</div><div class="val ${cls}">${val}</div></div>`
+    ).join('');
+    if (data.data_snapshot)
+      $el('snapshot-info').textContent = `Snapshot: ${data.data_snapshot} · Periodo: ${data.periodo_giorni} gg`;
+    // Aggiorna grafici con i nuovi KPI (usa le righe già caricate se disponibili)
+    updateCharts(null, k);
+  } catch(e) { showErr('Errore /summary: ' + e.message); }
+}
+
+// ── LISTA ─────────────────────────────────────────────────────────────────
+async function loadList() {
+  try {
+    clearErr();
+    expanded.clear();
+    const data = await apiFetch('/list', buildParams());
+    state.total = data.total;
+
+    const curSort = $el('f-sort').value;
+    const curDir  = $el('f-dir').value;
+    const thead = COLS.map(([key, h, thCls]) => {
+      const sortable = SORTABLE_COLS.has(key);
+      let cls = thCls || '';
+      if (sortable) {
+        cls += ' sortable';
+        if (key === curSort) cls += curDir === 'asc' ? ' sort-asc' : ' sort-desc';
+      }
+      return `<th class="${cls.trim()}"${sortable ? ` data-col="${key}"` : ''}>${h}</th>`;
+    }).join('');
+    const theadEl = $el('tbl').querySelector('thead');
+    theadEl.innerHTML = `<tr>${thead}</tr>`;
+    theadEl.querySelectorAll('th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if ($el('f-sort').value === col) {
+          $el('f-dir').value = $el('f-dir').value === 'desc' ? 'asc' : 'desc';
+        } else {
+          $el('f-sort').value = col;
+          $el('f-dir').value  = 'desc';
+        }
+        state.page = 1;
+        loadList();
+      });
+    });
+
+    const tbody = $el('tbl').querySelector('tbody');
+    if (!data.rows.length) {
+      tbody.innerHTML = `<tr><td colspan="${N_COLS}" class="text" style="padding:20px;color:var(--text-dim);">Nessun risultato</td></tr>`;
+    } else {
+      tbody.innerHTML = data.rows.map(r =>
+        `<tr class="expandable" data-id="${r.id_p}" data-codice="${r.codice||''}" data-nome="${(r.nome||'').replace(/"/g,'&quot;')}">
+          ${COLS.map(([k, , thCls, cellFmt]) => renderCell(k, thCls, cellFmt, r[k])).join('')}
+        </tr>`
+      ).join('');
+
+      tbody.querySelectorAll('tr.expandable').forEach(tr => {
+        tr.addEventListener('click', e => {
+          const drillTd = e.target.closest('td[data-tab]');
+          if (drillTd) {
+            const mode = drillTd.dataset.tab === 'corr' ? 'sped' : 'resi';
+            toggleDetail(tr, mode);
+          }
+        });
+      });
+    }
+    $el('pageInfo').textContent =
+      `${state.total.toLocaleString('it-IT')} prodotti` +
+      (state.total > state.page_size ? ` (visualizzati ${data.rows.length})` : '');
+    // Mostra/nascondi panel grafici laterale (inutile con 1 solo prodotto)
+    const singleProduct = state.total === 1;
+    document.querySelector('.chart-panel').style.display = singleProduct ? 'none' : '';
+
+    // Aggiorna sempre _lastRows; disegna i grafici solo se panel è visibile
+    _lastRows = data.rows;
+    if (!singleProduct) updateCharts(data.rows, null);
+
+    // Sezione marketplace sotto (visibile con 1 prodotto o 1 marca)
+    checkAndLoadMarketplace();
+  } catch(e) { showErr('Errore /list: ' + e.message); }
+}
+
+// ── TOGGLE DETTAGLIO ──────────────────────────────────────────────────────
+// mode: 'sped' = solo corrieri  |  'resi' = solo resi  |  'full' = evoluzione
+function toggleDetail(tr, mode = 'full') {
+  const id_p = Number(tr.dataset.id);
+  const existing = tr.nextElementSibling;
+
+  if (existing && existing.classList.contains('drill-row') && existing.dataset.for == id_p) {
+    if (existing.dataset.mode === mode) {
+      // Stesso contenuto → chiudi (distruggi eventuali chart nel panel)
+      existing.querySelectorAll('canvas[id^="corrChart_"], canvas[id^="resiChart_"]').forEach(c => {
+        if (c._drillChart) { c._drillChart.destroy(); delete c._drillChart; }
+      });
+      existing.remove();
+      tr.classList.remove('expanded');
+      expanded.delete(id_p);
+    } else {
+      // Contenuto diverso → ricarica senza chiudere
+      existing.dataset.mode = mode;
+      const box = existing.querySelector('.detail-box');
+      box.innerHTML = '<div class="loading">Caricamento…</div>';
+      loadDetailContent(existing, id_p, mode);
+    }
+    return;
+  }
+
+  tr.classList.add('expanded');
+  expanded.add(id_p);
+  const detailTr = document.createElement('tr');
+  detailTr.classList.add('drill-row');
+  detailTr.dataset.for = id_p;
+  detailTr.dataset.mode = mode;
+  detailTr.innerHTML = `<td colspan="${N_COLS}">
+    <div class="detail-box">
+      <div class="dd-title">${tr.dataset.codice} — ${tr.dataset.nome}</div>
+      <div class="loading">Caricamento…</div>
+    </div>
+  </td>`;
+  tr.after(detailTr);
+  loadDetailContent(detailTr, id_p, mode);
+}
+
+// ── CONTENUTO DETTAGLIO ───────────────────────────────────────────────────
+// mode: 'sped' = corrieri only  |  'resi' = resi only  |  'full' = evoluzione storica
+async function loadDetailContent(detailTr, id_p, mode = 'full') {
+  const box    = detailTr.querySelector('.detail-box');
+  const codice = tr_codice(detailTr);
+  const nome   = tr_nome(detailTr);
+
+  try {
+    const periodo = $el('f-periodo').value || '90';
+    const snap    = $el('f-snapshot').value;
+    const qsDet   = `periodo_giorni=${periodo}` + (snap ? `&data_snapshot=${snap}` : '');
+    const qsResi  = buildParams();
+
+    // ── MODALITÀ: Δ Spedizioni per corriere + dettaglio ordini ─────────────
+    if (mode === 'sped') {
+      const [corrData, detData] = await Promise.all([
+        apiFetch(`/corrieri/${id_p}`, qsDet).catch(err => {
+          console.warn('corrieri non disponibile:', err.message);
+          return { rows: [] };
+        }),
+        apiFetch(`/corrieri_dettaglio/${id_p}`, qsDet).catch(err => {
+          console.warn('corrieri_dettaglio non disponibile:', err.message);
+          return { rows: [] };
+        }),
+      ]);
+
+      const corrRows = corrData.rows || [];
+      const corrHtml = corrRows.length
+        ? corrRows.map(c => {
+            const dCls = pctClass(c.delta_sped, 'delta');
+            return `<tr>
+              <td class="text"><strong>${c.corriere}</strong></td>
+              <td>${fmt(c.num_ordini)}</td>
+              <td>${fmt(c.tot_pezzi)}</td>
+              <td>${fmtEur(c.tot_sped_fatt)}</td>
+              <td>${fmtEur(c.tot_sped_costi)}</td>
+              <td class="${dCls}">${fmtEur(c.delta_sped)}</td>
+              <td class="${dCls}">${fmtPct(c.perc_delta_sped)}</td>
+            </tr>`;
+          }).join('')
+        : `<tr><td colspan="7" class="text" style="padding:8px;color:var(--text-dim);">Nessun dato corrieri (tabella non ancora popolata o nessuna fattura nel periodo)</td></tr>`;
+
+      const detRows = detData.rows || [];
+      const detHtml = detRows.length
+        ? detRows.map(d => {
+            const dCls = pctClass(d.delta_sped, 'delta');
+            return `<tr>
+              <td>${d.id_ordine}</td>
+              <td class="text">${d.corriere}</td>
+              <td>${fmt(d.quantita)}</td>
+              <td>${fmtEur(d.sped_fatt)}</td>
+              <td>${fmtEur(d.sped_costi)}</td>
+              <td class="${dCls}">${fmtEur(d.delta_sped)}</td>
+            </tr>`;
+          }).join('')
+        : `<tr><td colspan="6" class="text" style="padding:8px;color:var(--text-dim);">Nessun dettaglio ordini (tabella non ancora popolata)</td></tr>`;
+
+      const uid = `dd_${id_p}`;
+      const chartH = Math.max(80, corrRows.length * 38);
+      box.innerHTML = `
+        <div class="dd-title">${codice} — ${nome}</div>
+        <div class="dd-meta">Δ Spedizioni · Snapshot: ${corrData.data_snapshot || '—'} · Periodo: ${corrData.periodo_giorni || periodo} gg</div>
+        <div class="detail-tabs">
+          <button onclick="showTab('${uid}','corr')">Per corriere (${corrRows.length})</button>
+          <button onclick="showTab('${uid}','det')">Dettaglio ordini (${detRows.length})</button>
+        </div>
+        <div id="${uid}_corr" class="detail-panel">
+          <div style="display:flex; gap:14px; align-items:flex-start;">
+            <div style="flex:1; min-width:0; overflow-x:auto;">
+              <table>
+                <thead><tr>
+                  <th class="text">Corriere</th><th>Ordini</th><th>Pezzi</th>
+                  <th>Incasso Sped.</th><th>Costo Sped.</th><th>Δ Sped.</th><th>% Δ</th>
+                </tr></thead>
+                <tbody>${corrHtml}</tbody>
+              </table>
+            </div>
+            <div style="width:260px; flex-shrink:0; position:relative; height:${chartH}px;">
+              <canvas id="corrChart_${uid}"></canvas>
+            </div>
+          </div>
+        </div>
+        <div id="${uid}_det" class="detail-panel">
+          <div style="max-height:25vh;overflow:auto;">
+          <table>
+            <thead><tr>
+              <th>ID Ordine</th><th class="text">Corriere</th><th>Qty</th>
+              <th>Incasso Sped.</th><th>Costo Sped.</th><th>Δ Sped.</th>
+            </tr></thead>
+            <tbody>${detHtml}</tbody>
+          </table></div>
+        </div>`;
+      showTab(uid, 'corr');
+
+      // Grafico istogramma Δ sped per corriere
+      if (corrRows.length) {
+        const chartCtx = document.getElementById(`corrChart_${uid}`);
+        if (chartCtx) {
+          const vals    = corrRows.map(c => Math.round(c.delta_sped || 0));
+          const colors  = vals.map(v => v >= 0 ? '#4ade80aa' : '#ff6b6baa');
+          const borders = vals.map(v => v >= 0 ? '#4ade80'   : '#ff6b6b');
+          const ch = new Chart(chartCtx, {
+            type: 'bar',
+            data: {
+              labels: corrRows.map(c => c.corriere),
+              datasets: [{ data: vals, backgroundColor: colors, borderColor: borders,
+                           borderWidth: 1, borderRadius: 3 }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: {
+                  label: c => ` € ${Math.round(c.raw).toLocaleString('it-IT')}` } }
+              },
+              scales: {
+                x: { grid: { display: false }, ticks: { color: '#9aa7bd', font: { size: 11 } } },
+                y: { grid: { color: '#2c3a55' },
+                     ticks: { color: '#9aa7bd',
+                              callback: v => '€ ' + Math.round(v).toLocaleString('it-IT') } },
+              }
+            }
+          });
+          chartCtx._drillChart = ch;  // salvo per cleanup
+        }
+      }
+
+    // ── MODALITÀ: Impatto economico resi ────────────────────────────────
+    } else if (mode === 'resi') {
+      const resi = await apiFetch(`/resi/${id_p}`, qsResi);
+      const aggRows  = resi.aggregato_per_tipo || [];
+      const resiRows = (resi.rows || []).slice(0, 200);
+
+      const aggHtml = aggRows.length
+        ? aggRows.map(a => `
+          <tr>
+            <td class="text">${a.tipo_rma}</td>
+            <td>${fmt(a.n_resi)}</td>
+            <td>${fmt(a.qty)}</td>
+            <td>${fmtEur(a.costo_perdita)}</td>
+            <td>${fmtEur(a.costo_sped_rientro)}</td>
+            <td>${fmtEur(a.claims)}</td>
+            <td>${fmtEur(a.recuperato)}</td>
+            <td class="red">${fmtEur(a.perdita_netta)}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="8" class="text" style="padding:8px;color:var(--text-dim);">Nessun reso registrato per questo prodotto</td></tr>`;
+
+      const resiHtml = resiRows.length
+        ? resiRows.map(r => `
+          <tr>
+            <td class="text">${r.data_rma ? r.data_rma.slice(0,10) : ''}</td>
+            <td>${r.id_rma}</td>
+            <td>${r.id_ordine}</td>
+            <td class="text">${r.tipo_rma}</td>
+            <td class="text">${r.marketplace || ''}</td>
+            <td>${fmt(r.quantita_rma)}</td>
+            <td>${fmtEur(r.costo_perdita)}</td>
+            <td>${fmtEur(r.costo_sped_rientro)}</td>
+            <td>${fmtEur(r.valore_claims)}</td>
+            <td>${fmtEur(r.valore_recuperato)}</td>
+            <td class="red">${fmtEur(r.perdita_netta)}</td>
+            <td class="text" style="max-width:180px;font-size:10px;color:var(--text-mute)">${r.nota_recovery || ''}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="12" class="text" style="padding:8px;color:var(--text-dim);">Nessun reso trovato</td></tr>`;
+
+      const uid = `dd_${id_p}`;
+      box.innerHTML = `
+        <div class="dd-title">${codice} — ${nome}</div>
+        <div class="dd-meta">Impatto economico resi · Periodo: ${periodo} gg</div>
+        <div class="detail-tabs">
+          <button onclick="showTab('${uid}','agg')">Per tipo RMA (${aggRows.length})</button>
+          <button onclick="showTab('${uid}','det')">Dettaglio resi (${resiRows.length})</button>
+        </div>
+        <div id="${uid}_agg" class="detail-panel">
+          <div style="display:flex; gap:14px; align-items:flex-start;">
+            <div style="flex:1; min-width:0; overflow-x:auto;">
+              <table>
+                <thead><tr>
+                  <th class="text">Tipo RMA</th><th>N° Resi</th><th>Qty</th>
+                  <th>Costo Perdita</th><th>Sped. Rientro</th><th>Claims</th><th>Recuperato</th><th>Perdita Netta</th>
+                </tr></thead>
+                <tbody>${aggHtml}</tbody>
+              </table>
+            </div>
+            <div style="width:200px; flex-shrink:0; position:relative; height:260px;">
+              <canvas id="resiChart_${uid}"></canvas>
+            </div>
+          </div>
+        </div>
+        <div id="${uid}_det" class="detail-panel">
+          <div style="max-height:25vh;overflow:auto;">
+          <table>
+            <thead><tr>
+              <th class="text">Data</th><th>ID RMA</th><th>Ordine</th>
+              <th class="text">Tipo</th><th class="text">Mktp</th><th>Qty</th>
+              <th>Costo Perd.</th><th>Sped. Rientro</th><th>Claims</th><th>Recup.</th><th>Perd. Netta</th><th class="text">Nota</th>
+            </tr></thead>
+            <tbody>${resiHtml}</tbody>
+          </table></div>
+        </div>`;
+      showTab(uid, 'agg');
+
+      // Grafico a torta perdita netta per tipo RMA
+      if (aggRows.length) {
+        const resiCtx = document.getElementById(`resiChart_${uid}`);
+        if (resiCtx) {
+          const palette = ['#ff6b6b','#fbbf24','#4f8cff','#a78bfa','#34d399','#fb923c','#4ade80','#9aa7bd','#f472b6'];
+          const validRows = aggRows.filter(a => Math.abs(a.perdita_netta || 0) > 0);
+          const ch = new Chart(resiCtx, {
+            type: 'doughnut',
+            data: {
+              labels: validRows.map(a => a.tipo_rma),
+              datasets: [{ data: validRows.map(a => Math.abs(a.perdita_netta)),
+                backgroundColor: palette.map(c => c + 'bb'),
+                borderColor:     palette,
+                borderWidth: 1 }]
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '55%',
+              plugins: {
+                legend: { position: 'bottom',
+                  labels: { color: '#e5eaf3', boxWidth: 10, padding: 6, font: { size: 10 },
+                    generateLabels: chart => chart.data.labels.map((lbl, i) => ({
+                      text: lbl,
+                      fillStyle:   chart.data.datasets[0].backgroundColor[i],
+                      strokeStyle: chart.data.datasets[0].borderColor[i],
+                      fontColor:   '#e5eaf3',
+                      color:       '#e5eaf3',
+                      lineWidth: 1, index: i, hidden: false })) } },
+                tooltip: { callbacks: {
+                  label: c => ` ${c.label}: € ${Math.round(c.raw).toLocaleString('it-IT')}` } }
+              }
+            }
+          });
+          resiCtx._drillChart = ch;
+        }
+      }
+
+    // ── MODALITÀ: Evoluzione storica (full) ─────────────────────────────
+    } else {
+      const detail = await apiFetch(`/detail/${id_p}`, qsDet);
+      const metaLine = `Snapshot: ${detail.data_snapshot} · Periodo: ${detail.periodo_giorni} gg · `
+        + `Fatturato: ${fmtEur(detail.tot_fatturato)} · Marg. Eff.: ${fmtEur(detail.margine_effettivo)} (${fmtPct(detail.perc_margine_eff)})`;
+
+      const evoRows = (detail.evoluzione || []).slice(0, 30);
+      const evoHtml = evoRows.length
+        ? evoRows.map(e => `
+          <tr>
+            <td class="text">${e.data_snapshot}</td>
+            <td>${fmtEur(e.tot_fatturato)}</td>
+            <td>${fmtEur(e.margine_effettivo)}</td>
+            <td class="${pctClass(e.perc_margine_eff,'margine_eff')}">${fmtPct(e.perc_margine_eff)}</td>
+            <td>${fmt(e.qty_resi)}</td>
+            <td class="red">${fmtEur(e.imp_eco_resi)}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="6" class="text" style="padding:8px;color:var(--text-dim);">Nessun dato storico</td></tr>`;
+
+      box.innerHTML = `
+        <div class="dd-title">${codice} — ${nome}</div>
+        <div class="dd-meta">${metaLine}</div>
+        <table>
+          <thead><tr>
+            <th class="text">Data Snapshot</th><th>Fatturato</th><th>Marg. Eff.</th>
+            <th>% Marg. Eff.</th><th>Resi</th><th>Imp. Resi</th>
+          </tr></thead>
+          <tbody>${evoHtml}</tbody>
+        </table>`;
+    }
+
+  } catch(e) {
+    box.innerHTML = `<div class="err-inline">Errore caricamento: ${e.message}</div>`;
+  }
+}
+
+function tr_codice(detailTr) { return detailTr.previousElementSibling?.dataset?.codice || ''; }
+function tr_nome(detailTr)   { return detailTr.previousElementSibling?.dataset?.nome   || ''; }
+
+// ── GESTIONE TAB DRILLDOWN (usato in modalità 'sped' e 'resi') ───────────────
+// Ordine tab per modalità:
+//   sped  → [corr=0, det=1]
+//   resi  → [agg=0, det=1]
+function showTab(uid, tab) {
+  const candidates = ['_corr','_agg','_det'].map(s => document.getElementById(`${uid}${s}`)).find(Boolean);
+  if (!candidates) return;
+  const box = candidates.closest('.detail-box');
+  if (!box) return;
+  box.querySelectorAll('.detail-panel').forEach(p => p.classList.remove('active'));
+  box.querySelectorAll('.detail-tabs button').forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById(`${uid}_${tab}`);
+  if (panel) panel.classList.add('active');
+  // Deriva l'indice del bottone dall'ordine in cui appaiono nel DOM
+  const btns = box.querySelectorAll('.detail-tabs button');
+  btns.forEach((btn, i) => {
+    if (btn.getAttribute('onclick')?.includes(`'${tab}'`)) btn.classList.add('active');
+  });
+}
+
+// ── SEZIONE MARKETPLACE ───────────────────────────────────────────────────
+// Visibile solo quando c'è 1 prodotto in lista (singolo prodotto) o una marca
+const MKTP_PALETTE = ['#4f8cff','#4ade80','#fbbf24','#ff6b6b','#a78bfa','#34d399','#fb923c','#9aa7bd'];
+
+async function checkAndLoadMarketplace() {
+  const section = $el('marketplace-section');
+  const marca   = $el('f-marca').value?.trim();
+  const isOneProd  = state.total === 1 && _lastRows.length === 1;
+  const isMarca    = !!marca;
+
+  if (!isOneProd && !isMarca) {
+    section.style.display = 'none';
+    _destroyChart('mktpBarChart');
+    return;
+  }
+
+  section.style.display = 'block';
+  const periodo = $el('f-periodo').value || '90';
+  const snap    = $el('f-snapshot').value;
+  let qs = `periodo_giorni=${periodo}` + (snap ? `&data_snapshot=${snap}` : '');
+
+  let contextLabel = '';
+  if (isOneProd) {
+    const r = _lastRows[0];
+    qs += `&id_p=${r.id_p}`;
+    contextLabel = `${r.codice} — ${r.nome}`;
+  } else {
+    qs += `&marca=${encodeURIComponent(marca)}`;
+    contextLabel = `Marca: ${marca}`;
+  }
+  $el('mktp-context').textContent = contextLabel;
+  $el('mktp-tbody').innerHTML = `<tr><td colspan="13" class="text" style="padding:10px;color:var(--text-dim)">Caricamento…</td></tr>`;
+
+  let data;
+  try {
+    data = await apiFetch('/marketplace_breakdown', qs);
+  } catch(e) {
+    $el('mktp-tbody').innerHTML = `<tr><td colspan="13" class="text" style="padding:10px;color:var(--neg)">Errore: ${e.message}</td></tr>`;
+    return;
+  }
+
+  const rows = data.rows || [];
+  _renderMktpTable(rows);
+  _renderMktpBar(rows);
+}
+
+function _renderMktpTable(rows) {
+  if (!rows.length) {
+    $el('mktp-tbody').innerHTML = `<tr><td colspan="13" class="text" style="padding:10px;color:var(--text-dim)">Nessun dato disponibile (tabella non ancora popolata)</td></tr>`;
+    return;
+  }
+  $el('mktp-tbody').innerHTML = rows.map(r => {
+    const mCls    = pctClass(r.perc_margine,     'margine');
+    const mEffCls = pctClass(r.perc_margine_eff, 'margine');
+    const dCls    = pctClass(r.delta_sped,        'delta');
+    const rCls    = pctClass(r.qty_resi > 0 ? (r.qty_resi / Math.max(r.num_ordini,1) * 100) : 0, 'resi');
+    return `<tr>
+      <td class="text"><strong>${r.marketplace}</strong></td>
+      <td>${fmt(r.num_ordini)}</td>
+      <td>${fmt(r.tot_pezzi)}</td>
+      <td>
+        ${fmtPct(r.perc_pezzi)}
+        <div class="mktp-bar"><div class="mktp-bar-inner" style="width:${Math.min(100,r.perc_pezzi||0)}%;background:var(--accent)"></div></div>
+      </td>
+      <td>${fmtEur(r.tot_fatturato)}</td>
+      <td>
+        ${fmtPct(r.perc_fatturato)}
+        <div class="mktp-bar"><div class="mktp-bar-inner" style="width:${Math.min(100,r.perc_fatturato||0)}%;background:#a78bfa"></div></div>
+      </td>
+      <td>${fmtEur(r.tot_margine)}</td>
+      <td class="${mCls}">${fmtPct(r.perc_margine)}</td>
+      <td class="${dCls}">${fmtEur(r.delta_sped)}</td>
+      <td class="${rCls}">${fmt(r.qty_resi)}</td>
+      <td class="neg">${fmtEur(r.imp_eco_resi)}</td>
+      <td>${fmtEur(r.margine_effettivo)}</td>
+      <td class="${mEffCls}">${fmtPct(r.perc_margine_eff)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function _renderMktpBar(rows) {
+  _destroyChart('mktpBarChart');
+  if (!rows.length) return;
+  const ctx = $el('mktpBarChart');
+  if (!ctx) return;
+  const colors = rows.map((_, i) => MKTP_PALETTE[i % MKTP_PALETTE.length]);
+  _charts['mktpBarChart'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.marketplace),
+      datasets: [{
+        label: 'Pezzi Venduti',
+        data: rows.map(r => r.tot_pezzi),
+        backgroundColor: colors.map(c => c + 'aa'),
+        borderColor: colors,
+        borderWidth: 1, borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: CHART_DEFAULTS.color } },
+        tooltip: { callbacks: {
+          label: c => ` ${c.dataset.label}: ${c.raw.toLocaleString('it-IT')} pz`
+        } }
+      },
+      scales: {
+        x: { grid: { color: CHART_DEFAULTS.gridColor }, ticks: { color: CHART_DEFAULTS.color } },
+        y: { grid: { color: CHART_DEFAULTS.gridColor }, ticks: { color: CHART_DEFAULTS.color, precision: 0 } },
+      }
+    }
+  });
+}
+
+// ── EVENT HANDLERS ────────────────────────────────────────────────────────
+$el('btn-apply').addEventListener('click',  () => { state.page = 1; loadList(); loadKpis(); });
+$el('f-periodo').addEventListener('change', () => { state.page = 1; loadList(); loadKpis(); });
+$el('f-snapshot').addEventListener('change',() => { state.page = 1; loadList(); loadKpis(); });
+$el('btn-export').addEventListener('click', () => {
+  window.location = '/admin/download-pl-prodotti.xlsx.asp?' + buildParams();
+});
+
+(async () => {
+  await loadFilters();
+  await loadKpis();
+  await loadList();
+})();
+</script>
