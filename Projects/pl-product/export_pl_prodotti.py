@@ -67,7 +67,12 @@ SELECT
   metrics.num_ordini,
   metrics.tot_pezzi,
   metrics.tot_fatturato,
-  COALESCE(margine_b.tot_margine, metrics.tot_margine) AS tot_margine
+  COALESCE(margine_b.tot_margine, metrics.tot_margine) AS tot_margine,
+  IFNULL(metrics.categoria,  '')  AS categoria,
+  IFNULL(metrics.categoria2, '')  AS categoria2,
+  IFNULL(metrics.categoria3, '')  AS categoria3,
+  IFNULL(metrics.sender,     '')  AS sender,
+  IFNULL(metrics.fornitore,  '')  AS fornitore
 
 FROM (
   -- Metriche principali aggregate per prodotto
@@ -76,7 +81,12 @@ FROM (
     COUNT(DISTINCT b.id_ordine)                                                 AS num_ordini,
     IFNULL(SUM(b.quantita), 0)                                                  AS tot_pezzi,
     IFNULL(SUM(b.venduto_tot + b.spese_sped_grat), 0)                           AS tot_fatturato,
-    IFNULL(SUM(b.utile - b.comm_mktp - b.comm_pagamento), 0)                    AS tot_margine
+    IFNULL(SUM(b.utile - b.comm_mktp - b.comm_pagamento), 0)                    AS tot_margine,
+    MAX(b.categoria)                                                             AS categoria,
+    MAX(b.categoria2)                                                            AS categoria2,
+    MAX(b.categoria3)                                                            AS categoria3,
+    MAX(b.sender)                                                                AS sender,
+    MAX(b.fornitore)                                                             AS fornitore
   FROM yeppon_stats.bollettato_total AS b
   JOIN ordini_cliente AS oc ON oc.id = b.id_ordine AND oc.pixmania NOT IN (10, 108)
   WHERE b.prezzo_vendita > 0
@@ -170,6 +180,7 @@ WHERE data_rma >= CURRENT_DATE - INTERVAL {periodo} DAY
 PL_TABLE = "yeppon_stats.pl_prodotti"
 PL_DB_COLS = [
     "id_p", "codice", "nome", "marca", "disp_fornitore",
+    "categoria", "categoria2", "categoria3", "sender", "fornitore",
     "status_prodotto", "bloccato", "bloccato_fino",
     "num_ordini", "tot_pezzi", "tot_fatturato", "tot_margine", "perc_margine",
     "tot_sped_fatt", "tot_sped_costi", "delta_sped", "perc_delta_sped",
@@ -1124,6 +1135,7 @@ def _run_period(periodo: int, engine, sp_df, spese_gratuite, country_stype, t0):
     print(f" {len(df_mktp)} righe, {len(marketplaces)} marketplace ({time.time() - t0:.1f}s)")
 
     prod_info_cols = ["id_p", "codice", "nome", "marca", "disp_fornitore",
+                      "categoria", "categoria2", "categoria3", "sender", "fornitore",
                       "status_prodotto", "bloccato", "bloccato_fino"]
     df_prod_info = df[prod_info_cols].copy()
 

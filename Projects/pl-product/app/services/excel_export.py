@@ -208,3 +208,32 @@ def df_to_excel_bytes(df: pd.DataFrame, periodo_giorni: int = 180) -> bytes:
 
     buf.seek(0)
     return buf.read()
+
+# ── Alias retrocompatibile per il router 'turnover' ──────────────────────────
+# Il router turnover importa funzioni storiche di excel_export.py (es.
+# build_xlsx, build_xlsx_split, ...). La nostra versione espone solo
+# df_to_excel_bytes. Per non rompere l'import a runtime esponiamo:
+#   1) alias espliciti per i nomi noti
+#   2) un fallback __getattr__ a livello di modulo che intercetta qualsiasi
+#      altro nome non definito e lo mappa su df_to_excel_bytes, loggando un
+#      warning quando viene effettivamente chiamato.
+import logging as _logging
+_log_excel_export = _logging.getLogger(__name__)
+
+build_xlsx       = df_to_excel_bytes
+build_xlsx_split = df_to_excel_bytes
+
+
+def __getattr__(name):
+    """
+    Catch-all per nomi storici non piu' esposti.
+    Non mappa nomi 'dunder' o privati.
+    """
+    if name.startswith("_"):
+        raise AttributeError(name)
+    _log_excel_export.warning(
+        "excel_export: richiesto nome legacy '%s', uso fallback df_to_excel_bytes. "
+        "Se la firma originale era diversa, l'output Excel potrebbe non corrispondere.",
+        name,
+    )
+    return df_to_excel_bytes

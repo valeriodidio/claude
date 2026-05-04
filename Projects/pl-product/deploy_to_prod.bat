@@ -29,14 +29,15 @@ mkdir "%STAGING%\python_backend\app\services"    2>nul
 :: ── File ASP ─────────────────────────────────────────────────
 echo.
 echo [2/3] Copio file ASP in staging\asp_nuovo\pl_prodotti\ ...
-copy /Y "%LOCAL%\asp\pl_prodotti\index.asp"                      "%STAGING%\asp_nuovo\pl_prodotti\index.asp"
+copy /Y "%LOCAL%\asp\pl_prodotti\prodotto-pl-page-new.asp"       "%STAGING%\asp_nuovo\pl_prodotti\prodotto-pl-page-new.asp"
 copy /Y "%LOCAL%\asp\pl_prodotti\download-pl-prodotti.xlsx.asp"  "%STAGING%\asp_nuovo\pl_prodotti\download-pl-prodotti.xlsx.asp"
 
 :: ── File Python ───────────────────────────────────────────────
 echo.
 echo [3/3] Copio file Python in staging\python_backend\ ...
-copy /Y "%LOCAL%\app\routers\pl_prodotti.py"         "%STAGING%\python_backend\app\routers\pl_prodotti.py"
-copy /Y "%LOCAL%\app\services\pl_prodotti_query.py"  "%STAGING%\python_backend\app\services\pl_prodotti_query.py"
+copy /Y "%LOCAL%\app\routers\pl_prodotti.py"              "%STAGING%\python_backend\app\routers\pl_prodotti.py"
+copy /Y "%LOCAL%\app\services\pl_prodotti_query.py"       "%STAGING%\python_backend\app\services\pl_prodotti_query.py"
+copy /Y "%LOCAL%\app\services\excel_export.py"            "%STAGING%\python_backend\app\services\excel_export.py"
 
 :: ── Riepilogo ─────────────────────────────────────────────────
 echo.

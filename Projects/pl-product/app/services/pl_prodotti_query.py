@@ -92,6 +92,11 @@ class Filters:
     # ── Filtri per resi (usati in get_resi e get_resi_global) ───────────────
     marketplace: List[str] = field(default_factory=list)
     tipo_rma: List[str] = field(default_factory=list)
+    categoria:  List[str] = field(default_factory=list)
+    categoria2: List[str] = field(default_factory=list)
+    categoria3: List[str] = field(default_factory=list)
+    sender:     List[str] = field(default_factory=list)
+    fornitore:  List[str] = field(default_factory=list)
     resi_dal: Optional[date] = None
     resi_al: Optional[date] = None
 
@@ -137,6 +142,11 @@ def _filters_to_dict(f: Filters, snap: Optional[date] = None) -> dict:
         "min_ordini":       f.min_ordini,
         "marketplace":      f.marketplace,
         "tipo_rma":         f.tipo_rma,
+        "categoria":        f.categoria,
+        "categoria2":       f.categoria2,
+        "categoria3":       f.categoria3,
+        "sender":           f.sender,
+        "fornitore":        f.fornitore,
         "resi_dal":         f.resi_dal.isoformat() if f.resi_dal else None,
         "resi_al":          f.resi_al.isoformat()  if f.resi_al  else None,
         "sort_by":          f.sort_by,
@@ -215,6 +225,26 @@ def _where(f: Filters, resolved_snapshot: date) -> tuple[str, dict]:
         clauses.append("num_ordini >= :min_ordini")
         params["min_ordini"] = int(f.min_ordini)
 
+    if f.categoria:
+        clauses.append("categoria IN :categoria")
+        params["categoria"] = tuple(f.categoria)
+
+    if f.categoria2:
+        clauses.append("categoria2 IN :categoria2")
+        params["categoria2"] = tuple(f.categoria2)
+
+    if f.categoria3:
+        clauses.append("categoria3 IN :categoria3")
+        params["categoria3"] = tuple(f.categoria3)
+
+    if f.sender:
+        clauses.append("sender IN :sender")
+        params["sender"] = tuple(f.sender)
+
+    if f.fornitore:
+        clauses.append("fornitore IN :fornitore")
+        params["fornitore"] = tuple(f.fornitore)
+
     where = " WHERE " + " AND ".join(clauses)
     return where, params
 
@@ -228,6 +258,26 @@ def _where_resi(f: Filters, extra_clauses: list = None, extra_params: dict = Non
     if f.marketplace:
         clauses.append("marketplace IN :marketplace")
         params["marketplace"] = tuple(f.marketplace)
+
+    if f.categoria:
+        clauses.append("categoria IN :categoria")
+        params["categoria"] = tuple(f.categoria)
+
+    if f.categoria2:
+        clauses.append("categoria2 IN :categoria2")
+        params["categoria2"] = tuple(f.categoria2)
+
+    if f.categoria3:
+        clauses.append("categoria3 IN :categoria3")
+        params["categoria3"] = tuple(f.categoria3)
+
+    if f.sender:
+        clauses.append("sender IN :sender")
+        params["sender"] = tuple(f.sender)
+
+    if f.fornitore:
+        clauses.append("fornitore IN :fornitore")
+        params["fornitore"] = tuple(f.fornitore)
 
     if f.tipo_rma:
         clauses.append("tipo_rma IN :tipo_rma")
@@ -279,6 +329,23 @@ def get_filter_options(engine: Engine) -> dict:
         ORDER BY marca
     """
     sql_mktp = f"SELECT DISTINCT marketplace FROM {TABLE_RESI} WHERE marketplace <> '' ORDER BY marketplace"
+    sql_cat_tree = f"""
+        SELECT DISTINCT categoria, categoria2, categoria3
+        FROM {TABLE_PL}
+        WHERE data_snapshot = (SELECT MAX(data_snapshot) FROM {TABLE_PL})
+          AND categoria <> ''
+        ORDER BY categoria, categoria2, categoria3
+    """
+    sql_sender = f"""
+        SELECT DISTINCT sender FROM {TABLE_PL}
+        WHERE data_snapshot = (SELECT MAX(data_snapshot) FROM {TABLE_PL})
+          AND sender <> '' ORDER BY sender
+    """
+    sql_forn = f"""
+        SELECT DISTINCT fornitore FROM {TABLE_PL}
+        WHERE data_snapshot = (SELECT MAX(data_snapshot) FROM {TABLE_PL})
+          AND fornitore <> '' ORDER BY fornitore
+    """
 
     # Metadati ultimo snapshot
     sql_meta = f"""
@@ -299,6 +366,21 @@ def get_filter_options(engine: Engine) -> dict:
             mktp = [r[0] for r in conn.execute(text(sql_mktp)).fetchall() if r[0]]
         except Exception:
             mktp = []
+        try:
+            rows_cat = conn.execute(text(sql_cat_tree)).fetchall()
+            cat_tree = [{"c1": r[0], "c2": r[1] or "", "c3": r[2] or ""} for r in rows_cat]
+            categorie = sorted(set(r[0] for r in rows_cat if r[0]))
+        except Exception:
+            cat_tree = []
+            categorie = []
+        try:
+            senders = [r[0] for r in conn.execute(text(sql_sender)).fetchall() if r[0]]
+        except Exception:
+            senders = []
+        try:
+            fornitori = [r[0] for r in conn.execute(text(sql_forn)).fetchall() if r[0]]
+        except Exception:
+            fornitori = []
         meta_row = conn.execute(text(sql_meta)).fetchone()
 
     # Se non ci sono periodi nel DB usa i valori standard
@@ -318,6 +400,10 @@ def get_filter_options(engine: Engine) -> dict:
         "snapshots": snapshots,
         "periodi_giorni": periodi,
         "marca": marche,
+        "categorie": categorie,
+        "categorie_tree": cat_tree,
+        "senders": senders,
+        "fornitori": fornitori,
         "marketplace": mktp,
         "tipi_rma": TIPI_RMA,
         "status_prodotto": [

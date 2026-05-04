@@ -5,6 +5,7 @@ Avvio in produzione (Windows Service via NSSM):
 """
 import logging
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,19 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import turnover, pl_prodotti
+from app.routers import pl_prodotti
+
+# Tentativo di caricare il router 'turnover' (l'altro progetto).
+# Se fallisce per QUALSIASI motivo (file mancante, ImportError, SyntaxError,
+# dipendenza non installata) lo registriamo nel log invece di nasconderlo,
+# altrimenti gli endpoint /api/reports/turnover/* danno 404 senza spiegazione.
+_has_turnover = False
+_turnover_import_error = None  # type: Optional[str]
+try:
+    from app.routers import turnover
+    _has_turnover = True
+except Exception as _e:
+    _turnover_import_error = "{}: {}".format(type(_e).__name__, _e)
 
 settings = get_settings()
 
@@ -21,6 +34,16 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 log = logging.getLogger("reports")
+
+# Log esplicito sullo stato dei router (visibile nello stderr.log all'avvio).
+if _has_turnover:
+    log.info("Router 'turnover' caricato correttamente.")
+else:
+    log.error(
+        "Router 'turnover' NON caricato → /api/reports/turnover/* darà 404. "
+        "Causa: %s",
+        _turnover_import_error,
+    )
 
 app = FastAPI(
     title="Yeppon Reports API",
@@ -63,7 +86,8 @@ def health():
 
 
 # ── Router ────────────────────────────────────────────────────────────────────
-app.include_router(turnover.router,    prefix="/api/reports/turnover",    tags=["turnover"])
+if _has_turnover:
+    app.include_router(turnover.router, prefix="/api/reports/turnover", tags=["turnover"])
 app.include_router(pl_prodotti.router, prefix="/api/reports/pl_prodotti", tags=["pl_prodotti"])
 
 

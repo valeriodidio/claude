@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS pl_prodotti (
     imp_Smarrimenti             DOUBLE          NOT NULL DEFAULT 0,
     margine_effettivo           DOUBLE          NOT NULL DEFAULT 0,
     perc_margine_eff            DOUBLE          NOT NULL DEFAULT 0,
+    categoria                   VARCHAR(100)    NOT NULL DEFAULT '',
+    categoria2                  VARCHAR(100)    NOT NULL DEFAULT '',
+    categoria3                  VARCHAR(100)    NOT NULL DEFAULT '',
+    sender                      VARCHAR(100)    NOT NULL DEFAULT '',
+    fornitore                   VARCHAR(100)    NOT NULL DEFAULT '',
     periodo_giorni              INT UNSIGNED    NOT NULL DEFAULT 180,
     data_snapshot               DATE            NOT NULL DEFAULT (CURRENT_DATE),
     data_calcolo                DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -59,7 +64,10 @@ CREATE TABLE IF NOT EXISTS pl_prodotti (
     INDEX idx_codice            (codice),
     INDEX idx_marca             (marca),
     INDEX idx_status            (status_prodotto),
-    INDEX idx_bloccato          (bloccato)
+    INDEX idx_bloccato          (bloccato),
+    INDEX idx_categoria         (categoria),
+    INDEX idx_sender            (sender),
+    INDEX idx_fornitore         (fornitore)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 

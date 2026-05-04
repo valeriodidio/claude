@@ -5,16 +5,12 @@
 Response.CodePage = 65001
 Response.Charset  = "UTF-8"
 
-' ============================================================
-' P&L Prodotti — admin Yeppon
-' Chiama il backend Python su http://127.0.0.1:8000
-' ============================================================
-Server.ScriptTimeout = 300
-
 Const INTERNAL_TOKEN = "change_me_long_random_string"
 Const REPORTS_BASE   = "/api/reports/pl_prodotti"
 %>
 <!doctype html>
+<html lang="it">
+<head>
 <meta charset="utf-8">
 <title>P&L Prodotti</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/css/select2.min.css">
@@ -220,16 +216,39 @@ td.drill-link:hover { filter: brightness(1.25); }
 .select2-container--default .select2-selection--single .select2-selection__rendered {
     color: var(--text); line-height: 28px; padding-left: 9px; }
 .select2-container--default .select2-selection--single .select2-selection__arrow { top: 3px; }
+.select2-container--default .select2-selection--multiple {
+    background: var(--bg-elev2); border-color: var(--border);
+    border-radius: 4px; min-height: 30px; height: auto; cursor: text; }
+.select2-container--default .select2-selection--multiple .select2-selection__rendered {
+    padding: 2px 4px; }
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background: var(--accent); border: none; color: #fff; font-size: 11px;
+    padding: 2px 6px 2px 22px; border-radius: 3px; margin: 2px 2px 0 0;
+    line-height: 16px; position: relative; }
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; padding: 0; margin: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.30); border: none; border-radius: 50%;
+    color: #fff !important; font-size: 12px; line-height: 1; cursor: pointer; }
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover,
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:focus {
+    background: rgba(0,0,0,0.60); color: #fff !important; }
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove span {
+    color: #fff !important; font-size: 13px; font-weight: bold; line-height: 1; }
+.select2-container--default .select2-selection--multiple .select2-search__field {
+    color: var(--text) !important; margin-top: 3px; }
 .select2-dropdown { background: var(--bg-elev2); border-color: var(--border); color: var(--text); }
 .select2-results__option { color: var(--text); font-size: 12px; }
 .select2-container--default .select2-results__option--highlighted { background: var(--accent) !important; }
 .select2-search__field { background: var(--bg-elev2) !important; color: var(--text) !important;
                           border-color: var(--border) !important; }
 </style>
-
+</head>
+<body>
 
 <div id="Content">
-<h1>P&amp;L Prodotti</h1>
+<h1>P&amp;L Prodotti <small>— endpoint: <code>/api/reports/pl_prodotti</code> · <a href="/api/reports/docs" target="_blank">Swagger</a></small></h1>
 
 <!-- ── FILTRI ─────────────────────────────────────────────────────────── -->
 <div class="filter-bar">
@@ -260,10 +279,6 @@ td.drill-link:hover { filter: brightness(1.25); }
     <div class="field">
       <label>Cerca</label>
       <input id="f-search" placeholder="codice / nome / id_p" style="width:160px">
-    </div>
-    <div class="field">
-      <label>Marca</label>
-      <select id="f-marca" style="width:190px"><option value="">— tutte —</option></select>
     </div>
     <div class="field">
       <label>Status</label>
@@ -298,6 +313,33 @@ td.drill-link:hover { filter: brightness(1.25); }
       <label class="checkbox-label" style="text-transform:none;letter-spacing:0">
         <input id="f-resi" type="checkbox"> Solo con resi
       </label>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <div class="field">
+      <label>Marca</label>
+      <select id="f-marca" multiple style="width:220px"></select>
+    </div>
+    <div class="field">
+      <label>Categoria</label>
+      <select id="f-categoria" multiple style="width:180px"></select>
+    </div>
+    <div class="field">
+      <label>Categoria 2</label>
+      <select id="f-categoria2" multiple style="width:180px"></select>
+    </div>
+    <div class="field">
+      <label>Categoria 3</label>
+      <select id="f-categoria3" multiple style="width:180px"></select>
+    </div>
+    <div class="field">
+      <label>Sender</label>
+      <select id="f-sender" multiple style="width:180px"></select>
+    </div>
+    <div class="field">
+      <label>Fornitore</label>
+      <select id="f-fornitore" multiple style="width:180px"></select>
     </div>
   </div>
 
@@ -422,10 +464,8 @@ td.drill-link:hover { filter: brightness(1.25); }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/js/select2.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-// ── Iniettati dal server ASP (non modificare) ────────────────────────────
 var INTERNAL_TOKEN = '<%=INTERNAL_TOKEN%>';
-var API_BASE       = '<%=REPORTS_BASE%>';
-var API = API_BASE;
+    var API = '<%=REPORTS_BASE%>';
 const $el = id => document.getElementById(id);
 
 // ── Formattazione numeri (standard Yeppon) ───────────────────────────────
@@ -754,7 +794,12 @@ function buildParams(extra) {
   p.append('periodo_giorni', $el('f-periodo').value || '180');
   const snap = $el('f-snapshot').value; if (snap) p.append('data_snapshot', snap);
   const search = $el('f-search').value.trim();  if (search)        p.append('search', search);
-  const marca  = $el('f-marca').value;          if (marca)         p.append('marca', marca);
+  for (const v of ($('#f-marca').val()     || [])) p.append('marca', v);
+  for (const v of ($('#f-categoria').val()  || [])) p.append('categoria', v);
+  for (const v of ($('#f-categoria2').val() || [])) p.append('categoria2', v);
+  for (const v of ($('#f-categoria3').val() || [])) p.append('categoria3', v);
+  for (const v of ($('#f-sender').val()    || [])) p.append('sender', v);
+  for (const v of ($('#f-fornitore').val() || [])) p.append('fornitore', v);
   const status = $el('f-status').value;         if (status !== '') p.append('status_prodotto', status);
   const blocc  = $el('f-bloccato').value;       if (blocc  !== '') p.append('bloccato', blocc);
   const fatt   = $el('f-fatt').value;           if (fatt)          p.append('min_fatturato', fatt);
@@ -820,12 +865,106 @@ async function loadFilters() {
       if (!selPer.value) { const o180 = selPer.querySelector('[value="180"]'); if (o180) o180.selected = true; }
     }
     const selMarca = $el('f-marca');
-    selMarca.innerHTML = '<option value="">— tutte —</option>';
+    selMarca.innerHTML = '';
     for (const m of data.marca || []) {
       const o = document.createElement('option'); o.value = m; o.textContent = m; selMarca.appendChild(o);
     }
-    // Inizializza Select2 sulla marca
-    $('#f-marca').select2({ placeholder: '— tutte —', allowClear: true, width: '190px',
+    $('#f-marca').select2({ placeholder: '— tutte —', allowClear: true, width: '220px',
+      dropdownCssClass: 'select2-dark' });
+
+    // Store full category tree for cascade filtering
+    window._catTree = data.categorie_tree || [];
+
+    // Helper: rebuild categoria2 options based on selected categoria values
+    function rebuildCat2() {
+      const sel1 = $('#f-categoria').val() || [];
+      const cat2set = new Set();
+      for (const row of window._catTree) {
+        if (sel1.length === 0 || sel1.includes(row.c1)) {
+          if (row.c2) cat2set.add(row.c2);
+        }
+      }
+      const prev2 = $('#f-categoria2').val() || [];
+      const sel2el = $el('f-categoria2');
+      sel2el.innerHTML = '';
+      for (const v of [...cat2set].sort()) {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        if (prev2.includes(v)) o.selected = true;
+        sel2el.appendChild(o);
+      }
+      $('#f-categoria2').trigger('change.select2');
+      rebuildCat3();
+    }
+
+    // Helper: rebuild categoria3 options based on selected categoria2 values
+    function rebuildCat3() {
+      const sel1 = $('#f-categoria').val() || [];
+      const sel2 = $('#f-categoria2').val() || [];
+      const cat3set = new Set();
+      for (const row of window._catTree) {
+        const ok1 = sel1.length === 0 || sel1.includes(row.c1);
+        const ok2 = sel2.length === 0 || sel2.includes(row.c2);
+        if (ok1 && ok2 && row.c3) cat3set.add(row.c3);
+      }
+      const prev3 = $('#f-categoria3').val() || [];
+      const sel3el = $el('f-categoria3');
+      sel3el.innerHTML = '';
+      for (const v of [...cat3set].sort()) {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        if (prev3.includes(v)) o.selected = true;
+        sel3el.appendChild(o);
+      }
+      $('#f-categoria3').trigger('change.select2');
+    }
+
+    // Populate categoria (level 1) from distinct values in tree
+    const cat1set = new Set((window._catTree).map(r => r.c1).filter(Boolean));
+    const selCat = $el('f-categoria');
+    selCat.innerHTML = '';
+    for (const v of [...cat1set].sort()) {
+      const o = document.createElement('option'); o.value = v; o.textContent = v; selCat.appendChild(o);
+    }
+    $('#f-categoria').select2({ placeholder: '— tutte —', allowClear: true, width: '180px',
+      dropdownCssClass: 'select2-dark' });
+    $('#f-categoria').on('change', function() { rebuildCat2(); });
+
+    // Initial populate of categoria2
+    const selCat2 = $el('f-categoria2');
+    selCat2.innerHTML = '';
+    const cat2set0 = new Set((window._catTree).map(r => r.c2).filter(Boolean));
+    for (const v of [...cat2set0].sort()) {
+      const o = document.createElement('option'); o.value = v; o.textContent = v; selCat2.appendChild(o);
+    }
+    $('#f-categoria2').select2({ placeholder: '— tutte —', allowClear: true, width: '180px',
+      dropdownCssClass: 'select2-dark' });
+    $('#f-categoria2').on('change', function() { rebuildCat3(); });
+
+    // Initial populate of categoria3
+    const selCat3 = $el('f-categoria3');
+    selCat3.innerHTML = '';
+    const cat3set0 = new Set((window._catTree).map(r => r.c3).filter(Boolean));
+    for (const v of [...cat3set0].sort()) {
+      const o = document.createElement('option'); o.value = v; o.textContent = v; selCat3.appendChild(o);
+    }
+    $('#f-categoria3').select2({ placeholder: '— tutte —', allowClear: true, width: '180px',
+      dropdownCssClass: 'select2-dark' });
+
+    const selSender = $el('f-sender');
+    selSender.innerHTML = '';
+    for (const v of data.senders || []) {
+      const o = document.createElement('option'); o.value = v; o.textContent = v; selSender.appendChild(o);
+    }
+    $('#f-sender').select2({ placeholder: '— tutti —', allowClear: true, width: '180px',
+      dropdownCssClass: 'select2-dark' });
+
+    const selForn = $el('f-fornitore');
+    selForn.innerHTML = '';
+    for (const v of data.fornitori || []) {
+      const o = document.createElement('option'); o.value = v; o.textContent = v; selForn.appendChild(o);
+    }
+    $('#f-fornitore').select2({ placeholder: '— tutti —', allowClear: true, width: '180px',
       dropdownCssClass: 'select2-dark' });
 
     const meta = data.meta || {};
@@ -1274,7 +1413,7 @@ const MKTP_PALETTE = ['#4f8cff','#4ade80','#fbbf24','#ff6b6b','#a78bfa','#34d399
 
 async function checkAndLoadMarketplace() {
   const section = $el('marketplace-section');
-  const marca   = $el('f-marca').value?.trim();
+  const marca   = ($('#f-marca').val() || []).join(',');
   const isOneProd  = state.total === 1 && _lastRows.length === 1;
   const isMarca    = !!marca;
 
@@ -1382,17 +1521,61 @@ function _renderMktpBar(rows) {
   });
 }
 
-// ── EVENT HANDLERS ────────────────────────────────────────────────────────
-$el('btn-apply').addEventListener('click',  () => { state.page = 1; loadList(); loadKpis(); });
-$el('f-periodo').addEventListener('change', () => { state.page = 1; loadList(); loadKpis(); });
-$el('f-snapshot').addEventListener('change',() => { state.page = 1; loadList(); loadKpis(); });
-$el('btn-export').addEventListener('click', () => {
-  window.location = '/admin/download-pl-prodotti.xlsx.asp?' + buildParams();
-});
+// ── LOAD DATA ────────────────────────────────────────────────────────────────
 
-(async () => {
+function loadData() {
+  clearErr();
+  loadKpis();
+  loadList();
+}
+
+// ── EVENT HANDLERS ────────────────────────────────────────────────────────────────────────
+
+function onFilterChange() { state.page = 1; loadData(); }
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Populate snapshot options
+  try {
+    const meta = await apiFetch('/snapshots');
+    const sel = $el('f-snapshot');
+    (meta.snapshots || []).forEach(s => {
+      const o = document.createElement('option');
+      o.value = s; o.textContent = s;
+      sel.appendChild(o);
+    });
+  } catch(_) {}
+
   await loadFilters();
-  await loadKpis();
-  await loadList();
-})();
+  loadData();
+
+  // Simple select/input filters
+  ['f-periodo','f-snapshot','f-status','f-bloccato','f-sort','f-dir'].forEach(id => {
+    const el = $el(id); if (el) el.addEventListener('change', onFilterChange);
+  });
+  ['f-fatt','f-ordini'].forEach(id => {
+    const el = $el(id); if (el) el.addEventListener('change', onFilterChange);
+  });
+  ['f-neg','f-resi'].forEach(id => {
+    const el = $el(id); if (el) el.addEventListener('change', onFilterChange);
+  });
+
+  // Debounced search
+  let _searchTimer;
+  $el('f-search').addEventListener('input', () => {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => { state.page = 1; loadData(); }, 400);
+  });
+
+  // Select2 multi-selects trigger data reload
+  ['#f-marca','#f-categoria','#f-categoria2','#f-categoria3','#f-sender','#f-fornitore'].forEach(sel => {
+    $(sel).on('change', onFilterChange);
+  });
+
+  // Export Excel
+  $el('btn-export').addEventListener('click', () => {
+    window.location = '/admin/download-pl-prodotti.xlsx.asp?' + buildParams();
+  });
+});
 </script>
+</body>
+</html>

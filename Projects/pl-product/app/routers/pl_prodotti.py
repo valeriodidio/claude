@@ -47,6 +47,12 @@ def _filters(
     search: Optional[str] = Query(None, max_length=80, description="Cerca su codice/nome/id_p"),
     min_fatturato: Optional[float] = Query(None, ge=0),
     min_ordini: Optional[int] = Query(None, ge=0),
+    # Filtri categoria/sender/fornitore
+    categoria:  Optional[List[str]] = Query(None),
+    categoria2: Optional[List[str]] = Query(None),
+    categoria3: Optional[List[str]] = Query(None),
+    sender:     Optional[List[str]] = Query(None),
+    fornitore:  Optional[List[str]] = Query(None),
     # Filtri resi
     marketplace: Optional[List[str]] = Query(None),
     tipo_rma: Optional[List[str]] = Query(None),
@@ -70,6 +76,11 @@ def _filters(
         search=(search or "").strip() or None,
         min_fatturato=min_fatturato,
         min_ordini=min_ordini,
+        categoria=categoria or [],
+        categoria2=categoria2 or [],
+        categoria3=categoria3 or [],
+        sender=sender or [],
+        fornitore=fornitore or [],
         marketplace=marketplace or [],
         tipo_rma=tipo_rma or [],
         resi_dal=resi_dal,
@@ -157,6 +168,33 @@ def resi_global(f: Filters = Depends(_filters)):
     return q.get_resi_global(get_engine(), f)
 
 
+# ── Endpoint: export Excel ───────────────────────────────────────────────────
+@router.get("/export.xlsx")
+def export_xlsx(f: Filters = Depends(_filters)):
+    """Esporta la lista prodotti (con tutti i filtri attivi) in formato Excel."""
+    import pandas as pd
+
+    # Prende tutto senza paginazione
+    f_all = Filters(
+        **{k: v for k, v in vars(f).items() if k not in ("page", "page_size")},
+        page=1,
+        page_size=99999,
+    )
+    result = q.get_list(get_engine(), f_all)
+    rows = result.get("rows", [])
+
+    df = pd.DataFrame(rows)
+    xlsx_bytes = excel_export.df_to_excel_bytes(df, periodo_giorni=f.periodo_giorni)
+
+    from datetime import datetime
+    fname = f"pl_prodotti_{datetime.now():%Y%m%d_%H%M}.xlsx"
+    return StreamingResponse(
+        iter([xlsx_bytes]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 # ── Endpoint: top-N per metrica ──────────────────────────────────────────────
 @router.get("/top/{metric}")
 def top(
@@ -187,9 +225,10 @@ def corrieri_summary(
 @router.get("/marketplace_breakdown")
 def marketplace_breakdown(
     id_p:           Optional[int]  = Query(None, description="Singolo prodotto (opzionale)"),
+    marca:          Optional[str]  = Query(None, description="Filtra per marca"),
     periodo_giorni: int            = Query(90),
     data_snapshot:  Optional[date] = Query(None),
 ):
-    """Breakdown vendite per marketplace di un singolo prodotto o di tutto il catalogo."""
+    """Breakdown vendite per marketplace di un singolo prodotto, marca o tutto il catalogo."""
     f = Filters(periodo_giorni=periodo_giorni, data_snapshot=data_snapshot)
-    return q.get_marketplace_breakdown(get_engine(), f, id_p=id_p)
+    return q.get_marketplace_breakdown(get_engine(), f, id_p=id_p, marca=marca)
